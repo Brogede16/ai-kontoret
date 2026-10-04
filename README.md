@@ -29,3 +29,15 @@ Serveren giver UI'et en lokal, skrivebeskyttet Codex-manager. Den kræver, at Co
 2. Lad manageren oprette konkrete opgaver og indsamle artefakter.
 3. Kobl Claude Code og Gemini CLI på som særskilte, eksplicit godkendte medarbejdere.
 4. Kobl GitHub-branches, tests, previews og senere Render/Xcode på gennem eksplicitte tilladelser.
+
+## Samarbejde gennem GitHub
+
+GitHub er nu gjort klar som fælles værksted for Mads og andre kodeagenter:
+
+- `AGENTS.md` forklarer produktets retning, sikkerhedsgrænser og Git-regler.
+- `docs/` indeholder den fælles produktretning og arbejdsaftale.
+- GitHub Issues har skabeloner til afgrænsede agentopgaver og fejl.
+- Pull requests har en fast afleveringsskabelon.
+- GitHub Actions kører syntakstjek på hver pull request og push til `main`.
+
+En anden AI bør få en konkret GitHub Issue, arbejde i sin egen branch og aflevere en pull request. Den skal ikke skrive direkte til `main`.
