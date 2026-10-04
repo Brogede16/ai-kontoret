@@ -42,6 +42,8 @@ let decisions = [
   { id: "scope", type: "Projektvalg", title: "Skal holdet fortsætte efter frokost?", text: "Manageren anbefaler, at vi bygger B videre, mens research afslutter indholdet.", primary: "Fortsæt", secondary: "Læs oplæg" }
 ];
 
+let managerWorkerOnline = false;
+
 const drawer = document.querySelector("#detail-drawer");
 const drawerContent = document.querySelector("#drawer-content");
 const scrim = document.querySelector("#scrim");
@@ -116,17 +118,51 @@ document.querySelector("#manager-form").addEventListener("submit", event => {
   const message = input.value.trim();
   if (!message) return;
   input.value = "";
-  decisions.unshift({ id: `new-${Date.now()}`, type: "Managerens plan", title: "Nyt oplæg er klar", text: `Jeg har forstået: “${message.length > 68 ? `${message.slice(0, 68)}…` : message}”. Jeg samler holdet og vender tilbage med et kort forslag.`, primary: "Se plan", secondary: "Vent" });
-  renderDecisions();
-  document.querySelector("[data-agent='manager'] small").textContent = "Fordeler ny opgave";
-  showToast("Manageren har taget imod idéen og fordeler et første spor.");
+  askManager(message);
 });
+
+async function askManager(message) {
+  const managerDesk = document.querySelector("[data-agent='manager'] small");
+  managerDesk.textContent = "Tænker over din idé";
+  showToast(managerWorkerOnline ? "Manageren tænker med Codex…" : "Demo-manageren samler et første oplæg…");
+
+  if (!managerWorkerOnline) {
+    setTimeout(() => {
+      decisions.unshift({ id: `new-${Date.now()}`, type: "Managerens plan", title: "Nyt oplæg er klar", text: `Jeg har forstået: “${message.length > 68 ? `${message.slice(0, 68)}…` : message}”. Jeg samler holdet og vender tilbage med et kort forslag.`, primary: "Se plan", secondary: "Vent" });
+      renderDecisions();
+      managerDesk.textContent = "Fordeler ny opgave";
+    }, 550);
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/manager", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Manageren kunne ikke svare.");
+    agents.manager.message = result.message;
+    agents.manager.status = "Har et oplæg klar til Mads";
+    agents.manager.artifacts.unshift(["Managerens oplæg", "netop nu"]);
+    decisions.unshift({ id: `manager-${Date.now()}`, type: "Managerens oplæg", title: "Et første forslag er klar", text: result.message, primary: "Læs hos manageren", secondary: "Gem til senere" });
+    renderDecisions();
+    managerDesk.textContent = "Har et oplæg klar";
+    showToast("Manageren er klar med et kort oplæg.");
+  } catch (error) {
+    managerDesk.textContent = "Kan ikke nå manageren";
+    showToast(error.message);
+  }
+}
 
 document.querySelector("#decision-list").addEventListener("click", event => {
   const button = event.target.closest("button[data-id]");
   if (!button) return;
   const card = button.closest(".decision-card");
   if (button.dataset.action === "accept") {
+    const selected = decisions.find(item => item.id === button.dataset.id);
+    if (selected?.type === "Managerens oplæg") return openAgent("manager");
     card.classList.add("done");
     showToast("Manageren har fået din retning og sætter holdet i gang.");
     setTimeout(() => { decisions = decisions.filter(item => item.id !== button.dataset.id); renderDecisions(); }, 400);
@@ -166,5 +202,20 @@ document.querySelector("#project-grid").addEventListener("click", event => {
 document.querySelector("#theme-button").addEventListener("click", () => { document.body.classList.toggle("evening"); showToast(document.body.classList.contains("evening") ? "Aftenstemning slået til." : "Dagslys slået til."); });
 document.querySelector("#profile-button").addEventListener("click", () => showToast("Mads-profilen bliver stedet, hvor du kan se og rette holdets præferencer om dig."));
 
+async function checkWorker() {
+  try {
+    const response = await fetch("/api/health", { cache: "no-store" });
+    const result = await response.json();
+    managerWorkerOnline = Boolean(result.ok);
+    if (managerWorkerOnline) {
+      document.querySelector(".office-status span").textContent = "Manageren er online";
+      document.querySelector(".office-status").setAttribute("title", "Codex-manageren kører lokalt og skrivebeskyttet på din Mac.");
+    }
+  } catch {
+    managerWorkerOnline = false;
+  }
+}
+
 renderDecisions();
 renderProjects();
+checkWorker();
