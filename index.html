@@ -232,6 +232,20 @@
       </form>
     </dialog>
 
+    <dialog id="preference-dialog">
+      <button class="dialog-close" data-close-dialog aria-label="Luk">×</button>
+      <p class="eyebrow">Mads-profilen</p>
+      <h2>Hvad skal manageren vide?</h2>
+      <p>En præference er et blødt signal med kontekst. Manageren må gerne foreslå en undtagelse, men skal forklare hvorfor.</p>
+      <form id="preference-form" class="project-form">
+        <input type="hidden" name="id" />
+        <label>Overskrift<input name="label" required maxlength="60" placeholder="Fx Mobil først" /></label>
+        <label>Forklaring<textarea name="value" required maxlength="400" placeholder="Fx Jeg tjekker oftest ind fra telefonen, så mobil skal virke før desktop-detaljer."></textarea></label>
+        <label>Sikkerhed<select name="confidence"><option value="bekræftet">Bekræftet · jeg mener det</option><option value="antagelse">Antagelse · prøv det af</option></select></label>
+        <button class="primary-action" type="submit">Gem præference <span>→</span></button>
+      </form>
+    </dialog>
+
     <dialog id="library-dialog">
       <button class="dialog-close" id="library-dialog-close" aria-label="Luk fælles bibliotek">×</button>
       <p class="eyebrow">Fælles bibliotek</p>

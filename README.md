@@ -35,6 +35,7 @@ Serveren lytter kun på `127.0.0.1`, men det alene beskytter ikke mod andre hjem
 - En læsbar projektsamtale med Mads' beskeder, managerens oplæg og registrerede beslutninger — ikke skjulte modeltanker.
 - Et chef-lag med direktionsbeslutninger først og mindre team-afgørelser nedenunder, begge med anbefaling, trade-off og timing.
 - Designgennemgange med to retninger, kriterier og anbefaling. De viser kun det grundlag, der faktisk er leveret.
+- Mads-profilen kan redigeres: tilføj, ret og fjern præferencer. Manageren får dem med i hvert oplæg som bløde signaler.
 - Vedvarende projekter, opgaver, leverancer, acceptkriterier og et fælles bibliotek med noter, briefs og links — gemt lokalt i `data/office-state.json`, som aldrig commit'es.
 - Lokale referencebilleder (PNG, JPEG, WebP eller GIF op til 2 MB) kan vedhæftes til et projekt og vises i biblioteket. De gemmes under `data/uploads/`, bliver ikke commit'et og er ikke læst af manageren eller sendt til en model.
 - En opgave har et ærligt livsforløb: planlagt → klar → i gang → afleveret. "I gang" kræver, at man skriver hvem der udfører den (Mads eller en agent uden for kontoret), fordi kontoret aldrig selv starter en model. En aflevering kræver et artefakt — et link/en placering eller en beskrivelse af tjekket — og gemmes i biblioteket. Skal Mads se den, lander den i indbakken, hvor han kan godkende eller sende den tilbage.

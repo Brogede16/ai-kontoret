@@ -66,7 +66,8 @@ function rejectForeignRequest(request) {
   if (request.method === "GET" || request.method === "HEAD") return null;
   const origin = request.headers.origin;
   if (origin && !allowedHosts.has(origin.replace(/^http:\/\//, ""))) return "Forespørgslen kom ikke fra kontoret selv.";
-  if (!/^application\/json\b/i.test(request.headers["content-type"] || "")) return "Kontoret tager kun imod JSON fra sin egen side.";
+  // Kun POST kan sendes som "simpel" cross-site-forespørgsel uden preflight. PATCH og DELETE kræver altid preflight, som serveren ikke besvarer.
+  if (request.method === "POST" && !/^application\/json\b/i.test(request.headers["content-type"] || "")) return "Kontoret tager kun imod JSON fra sin egen side.";
   return null;
 }
 
@@ -604,9 +605,45 @@ const server = createServer(async (request, response) => {
     } catch (error) { return json(response, 400, { error: error.message || "Opgaven kunne ikke opdateres." }); }
   }
 
+  if (segments[0] === "api" && segments[1] === "preferences" && ((request.method === "POST" && !segments[2]) || (["PATCH", "DELETE"].includes(request.method) && segments[2]))) {
+    try {
+      const body = request.method === "DELETE" ? {} : parseBody(await readBody(request));
+      const outcome = await mutate(state => {
+        if (request.method === "DELETE") {
+          const index = state.preferences.findIndex(item => item.id === segments[2]);
+          if (index < 0) throw new Error("Præferencen findes ikke længere.");
+          const [removed] = state.preferences.splice(index, 1);
+          addActivity(state, "manager", `Mads fjernede præferencen “${removed.label}”.`, null, "profile");
+          return { preference: removed };
+        }
+        const fields = preferenceFields(body);
+        if (request.method === "POST") {
+          const preference = { id: makeId("pref"), ...fields, source: "Tilføjet af Mads" };
+          state.preferences.push(preference);
+          addActivity(state, "manager", `Mads tilføjede præferencen “${preference.label}”.`, null, "profile");
+          return { preference };
+        }
+        const preference = state.preferences.find(item => item.id === segments[2]);
+        if (!preference) throw new Error("Præferencen findes ikke længere.");
+        Object.assign(preference, fields, { source: preference.source?.includes("redigeret") ? preference.source : `${preference.source || "Mads"} · redigeret` });
+        addActivity(state, "manager", `Mads redigerede præferencen “${preference.label}”.`, null, "profile");
+        return { preference };
+      });
+      return json(response, request.method === "POST" ? 201 : 200, { ok: true, ...outcome.result, office: officeView(outcome.state) });
+    } catch (error) { return json(response, 400, { error: error.message || "Præferencen kunne ikke gemmes." }); }
+  }
+
   if (request.method === "GET") return serveStatic(url.pathname, response);
   return json(response, 405, { error: "Metoden er ikke tilladt." });
 });
+
+// Præferencer er bløde signaler til manageren. Kun Mads kan skrive dem, og de må aldrig blive til forbud.
+function preferenceFields(body) {
+  const label = cleanText(body.label, 60);
+  const value = cleanText(body.value, 400);
+  if (!label || !value) throw new Error("En præference skal have en kort overskrift og en forklaring.");
+  return { label, value, confidence: body.confidence === "antagelse" ? "antagelse" : "bekræftet" };
+}
 
 function cleanText(value, max) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";

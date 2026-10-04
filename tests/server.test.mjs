@@ -275,3 +275,18 @@ test("en åben opgave kan fravælges, men en afleveret kan ikke", async () => {
     assert.equal((await request(port, "/api/tasks/task-command-center/drop", "POST", {})).status, 400);
   }, seed);
 });
+
+test("Mads kan tilføje, redigere og fjerne præferencer", () => withServer(async port => {
+  assert.equal((await request(port, "/api/preferences", "POST", { label: "", value: "x" })).status, 400);
+  const created = await request(port, "/api/preferences", "POST", { label: "Mobil først", value: "Jeg tjekker ind fra telefonen.", confidence: "antagelse" });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.preference.confidence, "antagelse");
+  const id = created.body.preference.id;
+  const edited = await request(port, `/api/preferences/${id}`, "PATCH", { label: "Mobil først", value: "Telefonen er primær.", confidence: "bekræftet" });
+  assert.equal(edited.status, 200);
+  assert.equal(edited.body.office.preferences.find(item => item.id === id).value, "Telefonen er primær.");
+  const removed = await request(port, `/api/preferences/${id}`, "DELETE");
+  assert.equal(removed.status, 200);
+  assert.equal(removed.body.office.preferences.some(item => item.id === id), false);
+  assert.equal((await request(port, `/api/preferences/${id}`, "DELETE")).status, 400);
+}));

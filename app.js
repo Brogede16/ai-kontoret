@@ -333,8 +333,45 @@ function openPresentations(projectId = selectedProjectId) {
 }
 
 function openProfile() {
-  const preferences = office.preferences.map(pref => `<li><span>${escapeHtml(pref.label)}</span><p>${escapeHtml(pref.value)}</p><small>${escapeHtml(pref.confidence)} · ${escapeHtml(pref.source)}</small></li>`).join("");
-  openDrawer(`<div class="drawer-agent-head"><span class="avatar large-avatar">M</span><div><p class="eyebrow">Redigerbar hukommelse</p><h2>Mads-profilen</h2><p>Præferencer er signaler med kilde, ikke automatiske forbud.</p></div></div><section class="drawer-section"><p class="eyebrow">Kendte præferencer</p><ul class="task-list preference-list">${preferences}</ul></section><div class="drawer-message"><strong>Sådan bruges det</strong>Manageren må gerne udfordre en præference, når den nye situation er anderledes — men skal vise dig hvorfor.</div>`);
+  const preferences = office.preferences.map(pref => `<li><span>${escapeHtml(pref.label)}</span><p>${escapeHtml(pref.value)}</p><small>${escapeHtml(pref.confidence)} · ${escapeHtml(pref.source)}</small><div class="task-actions"><button class="task-link" data-edit-preference="${escapeHtml(pref.id)}">Redigér</button><button class="task-link" data-delete-preference="${escapeHtml(pref.id)}">Fjern</button></div></li>`).join("");
+  openDrawer(`<div class="drawer-agent-head"><span class="avatar large-avatar">M</span><div><p class="eyebrow">Redigerbar hukommelse</p><h2>Mads-profilen</h2><p>Præferencer er signaler med kilde, ikke automatiske forbud. Manageren får dem med i hvert oplæg.</p></div></div><section class="drawer-section"><p class="eyebrow">Kendte præferencer</p><ul class="task-list preference-list">${preferences || "<li><p>Ingen præferencer endnu.</p></li>"}</ul></section><div class="drawer-message"><strong>Sådan bruges det</strong>Manageren må gerne udfordre en præference, når den nye situation er anderledes — men skal vise dig hvorfor.</div><div class="drawer-actions"><button class="drawer-action" data-new-preference>+ Tilføj præference <span>→</span></button></div>`);
+}
+
+function openPreferenceDialog(id = "") {
+  const form = document.querySelector("#preference-form");
+  form.reset();
+  const preference = office.preferences.find(item => item.id === id);
+  form.elements.id.value = preference?.id || "";
+  if (preference) {
+    form.elements.label.value = preference.label;
+    form.elements.value.value = preference.value;
+    form.elements.confidence.value = preference.confidence === "antagelse" ? "antagelse" : "bekræftet";
+  }
+  document.querySelector("#preference-dialog").showModal();
+}
+
+async function savePreference(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const { id, ...payload } = Object.fromEntries(new FormData(form));
+  try {
+    const result = await api(id ? `/api/preferences/${encodeURIComponent(id)}` : "/api/preferences", { method: id ? "PATCH" : "POST", body: JSON.stringify(payload) });
+    office = result.office;
+    document.querySelector("#preference-dialog").close();
+    openProfile();
+    showToast("Præferencen er gemt. Manageren får den med i næste oplæg.");
+  } catch (error) { showToast(error.message); }
+}
+
+async function deletePreference(id) {
+  const preference = office.preferences.find(item => item.id === id);
+  if (!preference || !confirm(`Fjern præferencen “${preference.label}”?`)) return;
+  try {
+    const result = await api(`/api/preferences/${encodeURIComponent(id)}`, { method: "DELETE" });
+    office = result.office;
+    openProfile();
+    showToast("Præferencen er fjernet.");
+  } catch (error) { showToast(error.message); }
 }
 
 function resetComposer() {
@@ -655,6 +692,11 @@ drawer.addEventListener("click", event => {
     managerInput.placeholder = compose.dataset.compose === "manager" ? defaultPlaceholder : `Hvad vil du bede manageren om omkring ${getAgent(compose.dataset.compose)?.name.toLowerCase() || "denne medarbejder"}?`;
   }
   if (openProjectButton) openProject(openProjectButton.dataset.openProject);
+  const editPreference = event.target.closest("[data-edit-preference]");
+  const removePreference = event.target.closest("[data-delete-preference]");
+  if (event.target.closest("[data-new-preference]")) openPreferenceDialog();
+  if (editPreference) openPreferenceDialog(editPreference.dataset.editPreference);
+  if (removePreference) deletePreference(removePreference.dataset.deletePreference);
   const startTaskButton = event.target.closest("[data-start-task]");
   const deliverTaskButton = event.target.closest("[data-deliver-task]");
   const dropTaskButton = event.target.closest("[data-drop-task]");
@@ -706,6 +748,7 @@ document.querySelector("#library-dialog-close").addEventListener("click", () => 
 document.querySelector("#library-form").addEventListener("submit", createLibraryItem);
 document.querySelector("#presentation-dialog-close").addEventListener("click", () => document.querySelector("#presentation-dialog").close());
 document.querySelector("#presentation-form").addEventListener("submit", createPresentation);
+document.querySelector("#preference-form").addEventListener("submit", savePreference);
 document.querySelector("#start-form").addEventListener("submit", event => submitTaskForm(event, "start", "Opgaven står som i gang."));
 document.querySelector("#deliver-form").addEventListener("submit", event => submitTaskForm(event, "deliver", "Afleveringen er gemt i biblioteket."));
 document.querySelectorAll("[data-close-dialog]").forEach(button => button.addEventListener("click", () => button.closest("dialog").close()));
