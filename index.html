@@ -25,6 +25,7 @@
           <button class="nav-item" data-nav="talent"><span>✦</span> Talenter</button>
           <button class="nav-item" data-nav="connections"><span>⌁</span> Forbindelser</button>
           <button class="nav-item" data-nav="library"><span>⌘</span> Bibliotek</button>
+          <button class="nav-item" data-nav="radar"><span>◎</span> Radar</button>
           <button class="nav-item" data-nav="history"><span>◷</span> Historik</button>
         </nav>
 
@@ -209,7 +210,7 @@
       <p>Opgaven bliver gemt i projektet. Den starter ikke en model eller ændrer noget, før den senere bliver tildelt bevidst.</p>
       <form id="task-form" class="project-form">
         <input type="hidden" name="projectId" />
-        <label>Ansvarlig rolle<select name="role"><option value="manager">Manageren</option><option value="designer">Designeren</option><option value="researcher">Researcheren</option><option value="developer">Udvikleren</option><option value="reviewer">Revieweren</option><option value="game_designer">Spildesigneren · talentbank</option><option value="graphic_designer">Grafikeren · talentbank</option><option value="copywriter">Tekstforfatteren · talentbank</option><option value="marketer">Marketingpersonen · talentbank</option></select></label>
+        <label>Ansvarlig rolle<select name="role"><option value="manager">Manageren</option><option value="designer">Designeren</option><option value="researcher">Researcheren</option><option value="developer">Udvikleren</option><option value="reviewer">Revieweren</option><option value="game_designer">Spildesigneren · talentbank</option><option value="graphic_designer">Grafikeren · talentbank</option><option value="copywriter">Tekstforfatteren · talentbank</option><option value="marketer">Marketingpersonen · talentbank</option><option value="trend_scout">Trendspejderen · talentbank</option></select></label>
         <label>Opgave<input name="title" required maxlength="160" placeholder="Fx Saml tre UI-retninger" /></label>
         <label>Hvad skal afleveres?<textarea name="description" maxlength="520" placeholder="Kontekst, materiale og konkret resultat."></textarea></label>
         <label>Hvordan ved vi, at den er god?<textarea name="acceptance" maxlength="520" placeholder="Acceptkriterier eller tjek."></textarea></label>
@@ -256,6 +257,19 @@
         <label>Forklaring<textarea name="value" required maxlength="400" placeholder="Fx Jeg tjekker oftest ind fra telefonen, så mobil skal virke før desktop-detaljer."></textarea></label>
         <label>Sikkerhed<select name="confidence"><option value="bekræftet">Bekræftet · jeg mener det</option><option value="antagelse">Antagelse · prøv det af</option></select></label>
         <button class="primary-action" type="submit">Gem præference <span>→</span></button>
+      </form>
+    </dialog>
+
+    <dialog id="radar-dialog">
+      <button class="dialog-close" data-close-dialog aria-label="Luk">×</button>
+      <p class="eyebrow">Radar</p>
+      <h2>Noget nyt værd at prøve?</h2>
+      <p>En ny model, et værktøj, et prompt-mønster eller et workflow. Skriv kort, hvorfor det kunne gøre kontorets arbejde bedre. Linket bliver ikke hentet automatisk.</p>
+      <form id="radar-form" class="project-form">
+        <label>Hvad er det?<input name="title" required maxlength="140" placeholder="Fx Plan-mode før kode i Claude Code" /></label>
+        <label>Hvorfor er det relevant for os?<textarea name="content" required maxlength="800" placeholder="Hvad lover det, og hvilket konkret forsøg kunne vise, om det holder?"></textarea></label>
+        <label>Kilde<input name="url" maxlength="600" placeholder="https://www.reddit.com/r/ClaudeAI/…" /></label>
+        <button class="primary-action" type="submit">Sæt på radaren <span>→</span></button>
       </form>
     </dialog>
 

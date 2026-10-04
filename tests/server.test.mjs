@@ -318,3 +318,25 @@ test("managerens kontekst skelner mellem planlagt, i gang og afleveret arbejde",
   assert.match(prompt, /Byg flow · udføres af Claude Code/);
   assert.match(prompt, /To retninger → afleveret: Retning A og B/);
 });
+
+test("radaren tager imod efterprøvelige punkter og kan skifte status", () => withServer(async port => {
+  assert.equal((await request(port, "/api/radar", "POST", { title: "Uden forklaring" })).status, 400);
+  assert.equal((await request(port, "/api/radar", "POST", { title: "X", content: "Y", url: "javascript:alert(1)" })).status, 400);
+  const created = await request(port, "/api/radar", "POST", { title: "Plan-mode før kode", content: "Færre omskrivninger.", url: "https://www.reddit.com/r/ClaudeAI/" });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.item.status, "ny");
+  const id = created.body.item.id;
+  assert.equal((await request(port, `/api/radar/${id}`, "PATCH", { status: "måske" })).status, 400);
+  const trying = await request(port, `/api/radar/${id}`, "PATCH", { status: "afprøves" });
+  assert.equal(trying.body.item.status, "afprøves");
+  const task = await request(port, "/api/tasks", "POST", { projectId: "ai-office", role: "trend_scout", title: "Afprøv: Plan-mode før kode" });
+  assert.equal(task.body.task.role, "trend_scout");
+  assert.equal((await request(port, `/api/radar/${id}`, "DELETE")).body.office.radar.length, 0);
+}));
+
+test("managerens kontekst får de åbne radar-punkter med", () => {
+  const prompt = managerPrompt("Hvad nu?", null, [], [], [], [], null, [{ status: "ny", title: "Plan-mode", content: "Færre omskrivninger." }]);
+  assert.match(prompt, /Radar .*kilderne er ikke læst/);
+  assert.match(prompt, /\[ny\] Plan-mode: Færre omskrivninger\./);
+  assert.doesNotMatch(managerPrompt("Hej", null, [], [], [], [], null), /Radar \(/);
+});

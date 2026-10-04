@@ -36,6 +36,7 @@ Serveren lytter kun på `127.0.0.1`, men det alene beskytter ikke mod andre hjem
 - Et chef-lag med direktionsbeslutninger først og mindre team-afgørelser nedenunder, begge med anbefaling, trade-off og timing.
 - Designgennemgange med to retninger, kriterier og anbefaling. De viser kun det grundlag, der faktisk er leveret.
 - Projekter kan omdøbes og have status Udforsker, Bygger, Pause eller Afsluttet; hvilende projekter lægges sidst. Materiale i biblioteket kan fjernes (et billede slettes også fra disken).
+- En radar over nyt i AI og vibecoding med Trendspejderen som rolle i talentbanken. Punkter går ny → afprøves → brugt/forkastet, "Prøv det af" bliver til en opgave, og manageren ser de åbne punkter.
 - Mads-profilen kan redigeres: tilføj, ret og fjern præferencer. Manageren får dem med i hvert oplæg som bløde signaler.
 - Vedvarende projekter, opgaver, leverancer, acceptkriterier og et fælles bibliotek med noter, briefs og links — gemt lokalt i `data/office-state.json`, som aldrig commit'es.
 - Lokale referencebilleder (PNG, JPEG, WebP eller GIF op til 2 MB) kan vedhæftes til et projekt og vises i biblioteket. De gemmes under `data/uploads/`, bliver ikke commit'et og er ikke læst af manageren eller sendt til en model.

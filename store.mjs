@@ -80,6 +80,14 @@ export function createSeedState() {
         competencies: ["Målgruppe", "Positionering", "Værditilbud", "Launch-hypoteser"],
         handoff: "Afleverer en målgruppe- og positioneringsnote. Udfører aldrig køb, annoncering eller publicering.",
         message: "Jeg kan skærpe, hvem produktet er til, og hvordan det forklares. Jeg må aldrig selv udgive, købe annoncer eller starte en kampagne."
+      },
+      trend_scout: {
+        id: "trend_scout", initial: "V", face: "trend-scout-face", name: "Trendspejderen", role: "AI-radar & vibecoding",
+        availability: "bench", status: "I talentbanken · ikke forbundet", task: { title: "Klar til at holde radaren ved lige", description: "Holder øje med nye modeller, værktøjer, prompt-mønstre og vibecoding-workflows — og siler det ned til det, kontoret faktisk kan bruge.", progress: 0 },
+        artifacts: [{ name: "Radar-note", state: "kompetencepakke" }, { name: "Forsøgsforslag", state: "kompetencepakke" }],
+        competencies: ["Nye modeller og værktøjer", "Prompt-mønstre", "Vibecoding-workflows", "Kildekritik"],
+        handoff: "Afleverer korte radar-punkter med kilde, hvad det betyder for kontoret, og et konkret forsøg, holdet kan lave.",
+        message: "Hype er gratis, afprøvning er ikke. Jeg foreslår kun noget, hvis det kan prøves af på et rigtigt projekt. Jeg henter ikke selv fra nettet endnu — radaren fyldes af dig eller en senere godkendt worker."
       }
     },
     connectors: {
@@ -133,6 +141,7 @@ export function createSeedState() {
     ],
     presentations: [],
     attachments: [],
+    radar: [],
     libraryItems: [
       {
         id: "reference-office-direction", projectId: "ai-office", type: "brief", title: "Produktretning for AI-kontoret",
@@ -204,6 +213,7 @@ export function createOfficeStore(filePath) {
       if (!Array.isArray(state.conversations)) state.conversations = [];
       if (!Array.isArray(state.presentations)) state.presentations = [];
       if (!Array.isArray(state.attachments)) state.attachments = [];
+      if (!Array.isArray(state.radar)) state.radar = [];
       state.version = Math.max(Number(state.version) || 1, 5);
     } catch (error) {
       if (error.code !== "ENOENT") throw error;

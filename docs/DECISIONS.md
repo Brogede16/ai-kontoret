@@ -120,6 +120,14 @@ Denne fil er den korte, menneskelæselige beslutningslog for produktets retning.
 
 **Hvorfor:** Kontoret starter ikke selv modeller endnu. Uden et navn ville "i gang" antyde, at en rolle arbejdede af sig selv.
 
+## 019 · Radaren: holdet holder sig opdateret gennem forsøg
+
+**Beslutning:** Kontoret har en fælles radar over nyt i AI og vibecoding (modeller, værktøjer, prompt-mønstre, workflows) og en Trendspejder-rolle i talentbanken. Et radar-punkt går ny → afprøves → brugt eller forkastet. "Prøv det af" bliver til en almindelig opgave på det valgte projekt. Manageren får de åbne punkter med i sin kontekst, men har ikke læst kilderne.
+
+**Hvorfor:** Mads vil have et hold, der følger med i, hvad der rykker. Værdien opstår først, når et punkt er afprøvet på et rigtigt projekt; ellers bliver radaren en læseliste.
+
+**Grænse:** Radaren fyldes indtil videre af Mads. Automatisk indsamling (fx Reddit-RSS, changelogs eller en planlagt Claude Code-kørsel) kræver netadgang for en worker og er en særskilt beslutning.
+
 ## Åbne beslutninger
 
 - Hvilken worker skal først få eksplicit, begrænset adgang: GitHub, en lokal projektmappe eller research?

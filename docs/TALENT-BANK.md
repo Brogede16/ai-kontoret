@@ -52,6 +52,14 @@ En ansættelse betyder **ikke**, at systemet installerer en CLI, logger ind på 
 - **Samarbejder med:** manager, researcher og tekstforfatter.
 - **Hårde grænser:** ingen annoncer, køb, kampagner eller publicering.
 
+### Trendspejderen
+
+- **Kompetencer:** nye modeller og værktøjer, prompt-mønstre, vibecoding-workflows og kildekritik.
+- **Artefakt:** et radar-punkt med kilde, hvorfor det er relevant for kontoret, og et konkret forsøg — eller en forsøgsrapport: før/efter og en anbefaling (brug, tilpas, forkast).
+- **Samarbejder med:** manager, udvikler og reviewer.
+- **Bruges når:** et nyt værktøj eller mønster kan gøre holdets arbejde bedre eller billigere, og det kan prøves af på et rigtigt projekt.
+- **Grænse:** henter ikke selv fra nettet, før en worker med netadgang er godkendt. Hype uden forsøg er ikke en aflevering.
+
 ## Kompetencepakker er ikke træning
 
 En kompetencepakke beskriver briefskabelon, tjekliste, artefaktformat og samarbejdsgrænser. Den gør teamets arbejde mere konsistent, men den gør ikke en underliggende model permanent bedre eller erstatter dokumentation i projektet.
