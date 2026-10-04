@@ -15,7 +15,7 @@ function activity(actorId, text, projectId = null, kind = "status") {
 
 export function createSeedState() {
   return {
-    version: 1,
+    version: 2,
     updatedAt: now(),
     activeProjectId: "ai-office",
     agents: {
@@ -75,6 +75,14 @@ export function createSeedState() {
       }
     ],
     decisions: [],
+    conversations: [
+      {
+        id: "conversation-welcome", projectId: "ai-office", role: "manager", kind: "note",
+        text: "Jeg gemmer projektets samtale, oplæg og beslutninger her. Det er en læsbar historik — ikke en skjult model-log.",
+        createdAt: now()
+      }
+    ],
+    presentations: [],
     libraryItems: [
       {
         id: "reference-office-direction", projectId: "ai-office", type: "brief", title: "Produktretning for AI-kontoret",
@@ -96,6 +104,11 @@ export function createSeedState() {
 export function addActivity(state, actorId, text, projectId = null, kind = "status") {
   state.activity.unshift(activity(actorId, text, projectId, kind));
   state.activity = state.activity.slice(0, 60);
+}
+
+export function addConversation(state, projectId, role, text, kind = "message", relatedId = null) {
+  state.conversations.unshift({ id: id("conversation"), projectId, role, text, kind, relatedId, createdAt: now() });
+  state.conversations = state.conversations.slice(0, 240);
 }
 
 export function tasksForProject(state, projectId) {
@@ -126,6 +139,9 @@ export function createOfficeStore(filePath) {
     try {
       state = JSON.parse(await readFile(filePath, "utf8"));
       if (!Array.isArray(state.libraryItems)) state.libraryItems = [];
+      if (!Array.isArray(state.conversations)) state.conversations = [];
+      if (!Array.isArray(state.presentations)) state.presentations = [];
+      state.version = Math.max(Number(state.version) || 1, 2);
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
       state = createSeedState();

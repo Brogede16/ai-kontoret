@@ -60,6 +60,7 @@
             <button type="button" class="attach-button" id="attach-button" aria-label="Vedhæft et billede eller en fil">＋</button>
             <button type="submit" class="send-button" aria-label="Send besked">↑</button>
           </form>
+          <button class="chat-history-button" id="chat-history" aria-label="Åbn projektsamtalen">☷<span>Samtale</span></button>
           <button class="voice-button" aria-label="Indtal besked">◉</button>
         </section>
 
@@ -141,7 +142,7 @@
               <div><p class="eyebrow">Din indbakke</p><h2>Venter på Mads</h2></div>
               <span class="count-badge" id="panel-count">0</span>
             </div>
-            <p class="panel-intro">Manageren har filtreret dagens arbejde til de ting, hvor din retning gør en forskel.</p>
+            <p class="panel-intro" id="decision-intro">Manageren har filtreret dagens arbejde til de ting, hvor din retning gør en forskel.</p>
             <div id="decision-list" class="decision-list"></div>
             <button class="see-all" id="see-all">Se hele indbakken <span>→</span></button>
           </aside>
@@ -210,6 +211,23 @@
         <label>Titel<input name="title" required maxlength="120" placeholder="Fx Reference: koncert-appens stemning" /></label>
         <label>Indhold eller URL<textarea name="content" required maxlength="1600" placeholder="Skriv konteksten her, eller indsæt et link med en kort forklaring."></textarea></label>
         <button class="primary-action" type="submit">Gem i biblioteket <span>→</span></button>
+      </form>
+    </dialog>
+
+    <dialog id="presentation-dialog">
+      <button class="dialog-close" id="presentation-dialog-close" aria-label="Luk designgennemgang">×</button>
+      <p class="eyebrow">Designgennemgang</p>
+      <h2>Gør et designvalg konkret</h2>
+      <p>Beskriv to faktiske retninger, kriterierne og en anbefaling. Når en worker senere kan levere previews, skal de linkes eller lægges i biblioteket — ikke opfindes her.</p>
+      <form id="presentation-form" class="project-form">
+        <input type="hidden" name="projectId" />
+        <label>Beslutningsniveau<select name="level"><option value="executive">Direktion · Mads vælger</option><option value="team">Team · Mads kan kigge ind</option></select></label>
+        <label>Titel<input name="title" required maxlength="160" placeholder="Fx Vælg den visuelle retning for onboarding" /></label>
+        <label>Retning A<textarea name="directionA" required maxlength="1200" placeholder="Hvad viser den? Link eller beskriv det konkrete preview/reference."></textarea></label>
+        <label>Retning B<textarea name="directionB" required maxlength="1200" placeholder="Hvad er alternativet, og hvad ændrer det?"></textarea></label>
+        <label>Vurderingskriterier<textarea name="criteria" required maxlength="1200" placeholder="Fx mobilforståelse, tempo, brand og hvor let den er at kode."></textarea></label>
+        <label>Managerens anbefaling<textarea name="recommendation" maxlength="1200" placeholder="Hvilken retning anbefales — og hvorfor?"></textarea></label>
+        <button class="primary-action" type="submit">Klargør designvalg <span>→</span></button>
       </form>
     </dialog>
 

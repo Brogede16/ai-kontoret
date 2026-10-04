@@ -104,14 +104,33 @@ function renderProjects() {
 function renderDecisions() {
   const list = document.querySelector("#decision-list");
   const decisions = office.decisions || [];
-  list.innerHTML = decisions.length ? decisions.map(item => `
-    <article class="decision-card" data-decision="${escapeHtml(item.id)}">
-      <span class="decision-type">${escapeHtml(item.type)}</span>
-      <h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.text)}</p>
-      <div class="decision-actions"><button data-action="primary" data-id="${escapeHtml(item.id)}">${escapeHtml(item.primary)}</button><button data-action="secondary" data-id="${escapeHtml(item.id)}">${escapeHtml(item.secondary)}</button></div>
-    </article>`).join("") : `<div class="empty-state">Alt er afklaret lige nu. Manageren kan fortsætte med det, der er klart.</div>`;
+  const executive = decisions.filter(item => item.level === "executive");
+  const team = decisions.filter(item => item.level !== "executive");
+  list.innerHTML = decisions.length ? `${decisionGroup("Direktion", "Retning, smag og valg med stor effekt.", executive)}${decisionGroup("Team-afgørelser", "Mindre, reversibelt arbejde du kan tage, når det passer.", team)}` : `<div class="empty-state">Alt er afklaret lige nu. Manageren kan fortsætte med det, der er klart.</div>`;
   document.querySelector("#inbox-count").textContent = decisions.length;
   document.querySelector("#panel-count").textContent = decisions.length;
+  document.querySelector("#decision-intro").textContent = executive.length ? `${executive.length} direktionsvalg venter. Team-afgørelser kan tages, når du har tid.` : "Ingen store valg venter. De mindre team-afgørelser er samlet nedenfor.";
+}
+
+function urgencyLabel(urgency) {
+  return ({ now: "nu", today: "i dag", when_ready: "kan vente" })[urgency] || "kan vente";
+}
+
+function decisionCard(item, drawer = false) {
+  const primaryData = drawer ? `data-drawer-decision="${escapeHtml(item.id)}" data-choice="primary"` : `data-action="primary" data-id="${escapeHtml(item.id)}"`;
+  const secondaryData = drawer ? `data-drawer-decision="${escapeHtml(item.id)}" data-choice="secondary"` : `data-action="secondary" data-id="${escapeHtml(item.id)}"`;
+  return `<article class="decision-card ${item.level === "executive" ? "executive-decision" : "team-decision"}" data-decision="${escapeHtml(item.id)}">
+    <div class="decision-meta"><span class="decision-type">${item.level === "executive" ? "Direktion" : "Team"}</span><span class="decision-urgency">${escapeHtml(urgencyLabel(item.urgency))}</span></div>
+    <h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.text)}</p>
+    <div class="decision-detail"><b>Managerens anbefaling</b><span>${escapeHtml(item.recommendation)}</span></div>
+    <div class="decision-detail tradeoff"><b>Afvejning</b><span>${escapeHtml(item.tradeoff)}</span></div>
+    <div class="decision-actions"><button ${primaryData}>${escapeHtml(item.primary)}</button><button ${secondaryData}>${escapeHtml(item.secondary)}</button></div>
+  </article>`;
+}
+
+function decisionGroup(title, intro, items, drawer = false) {
+  if (!items.length) return "";
+  return `<section class="decision-group"><div class="decision-group-head"><strong>${title}</strong><span>${intro}</span></div>${items.map(item => decisionCard(item, drawer)).join("")}</section>`;
 }
 
 function openDrawer(content) {
@@ -141,7 +160,7 @@ function openAgent(id) {
     </section>
     <section class="drawer-section"><p class="eyebrow">Arbejdsbord</p><h3>Seneste materiale</h3><ul class="artifact-list">${agent.artifacts.map(artifact => `<li><span>${escapeHtml(artifact.name)}</span><small>${escapeHtml(artifact.state)}</small></li>`).join("")}</ul></section>
     <section class="drawer-section"><p class="eyebrow">Besked til dig</p><div class="drawer-message"><strong>${escapeHtml(agent.name)} siger</strong>${escapeHtml(agent.message)}</div></section>
-    <button class="drawer-action" data-compose="${escapeHtml(id)}">Skriv til manageren om ${escapeHtml(agent.name.toLowerCase())} <span>→</span></button>`);
+    <div class="drawer-actions">${id === "manager" ? `<button class="drawer-secondary" data-open-conversation>Se projektsamtalen</button>` : ""}<button class="drawer-action" data-compose="${escapeHtml(id)}">Skriv til manageren om ${escapeHtml(agent.name.toLowerCase())} <span>→</span></button></div>`);
 }
 
 function stateLabel(task) {
@@ -153,12 +172,14 @@ function openProject(id) {
   if (!project) return;
   const tasks = office.tasks.filter(task => task.projectId === id);
   const references = (office.libraryItems || []).filter(item => item.projectId === id);
+  const presentations = (office.presentations || []).filter(item => item.projectId === id);
   openDrawer(`
     <div class="project-drawer-head"><span class="project-dot" style="background:${escapeHtml(project.color)}"></span><p class="eyebrow">${escapeHtml(project.state)}</p><h2>${escapeHtml(project.name)}</h2><p>${escapeHtml(project.description)}</p></div>
     <section class="drawer-section"><p class="eyebrow">Fremdrift</p><div class="task-card"><strong>${project.progress}% samlet</strong><p>${project.activeCount} arbejder nu · ${project.readyCount} opgaver er klar · ${project.taskCount} i alt</p><div class="task-progress"><i style="width:${project.progress}%"></i></div></div></section>
     <section class="drawer-section"><p class="eyebrow">Fælles kontekst</p><div class="library-summary"><strong>${references.length} ${references.length === 1 ? "materiale" : "materialer"}</strong><p>Noter, briefs og links, der følger projektet.</p><button class="task-ready" data-open-library="${escapeHtml(project.id)}">Åbn bibliotek</button></div></section>
+    <section class="drawer-section"><p class="eyebrow">Designvalg</p><div class="library-summary"><strong>${presentations.length} ${presentations.length === 1 ? "gennemgang" : "gennemgange"}</strong><p>Konkrete sammenligninger til Mads — aldrig opdigtede previews.</p><button class="task-ready" data-open-presentations="${escapeHtml(project.id)}">Se designgennemgange</button></div></section>
     <section class="drawer-section"><p class="eyebrow">Arbejdskø</p><h3>Opgaver</h3><ul class="task-list">${tasks.length ? tasks.map(task => `<li><span class="task-state ${escapeHtml(task.state)}">${escapeHtml(stateLabel(task))}</span><strong>${escapeHtml(task.title)}</strong><p>${escapeHtml(task.description || "Ingen ekstra beskrivelse.")}</p>${task.acceptance ? `<p class="task-acceptance"><b>Tjek:</b> ${escapeHtml(task.acceptance)}</p>` : ""}<small>${escapeHtml(getAgent(task.role)?.name || task.role)} · ${task.progress}%</small>${task.state === "planned" ? `<button class="task-ready" data-ready-task="${escapeHtml(task.id)}">Klargør til worker</button>` : ""}</li>`).join("") : "<li><p>Der er ingen opgaver endnu. Skriv til manageren for at lave det første spor.</p></li>"}</ul></section>
-    <div class="drawer-actions"><button class="drawer-secondary" data-new-task="${escapeHtml(project.id)}">+ Ny opgave</button><button class="drawer-action" data-focus-project="${escapeHtml(project.id)}">Gør til dagens fokus <span>→</span></button></div>`);
+    <div class="drawer-actions"><button class="drawer-secondary" data-new-presentation="${escapeHtml(project.id)}">+ Designgennemgang</button><button class="drawer-secondary" data-new-task="${escapeHtml(project.id)}">+ Ny opgave</button><button class="drawer-action" data-focus-project="${escapeHtml(project.id)}">Gør til dagens fokus <span>→</span></button></div>`);
 }
 
 function referenceTypeLabel(type) {
@@ -178,6 +199,20 @@ function openActivity() {
     return `<li>${face(agent, true)}<div><strong>${escapeHtml(agent?.name || "Kontoret")}</strong><p>${escapeHtml(item.text)}</p><small>${formatTime(item.at)}</small></div></li>`;
   }).join("");
   openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">◷</span><div><p class="eyebrow">Revision af rigtige hændelser</p><h2>Dagens aktivitet</h2><p>Ingen skjulte tanker. Kun handlinger, status og afleveringer.</p></div></div><section class="drawer-section"><ul class="activity-list">${rows}</ul></section>`);
+}
+
+function openConversation(projectId = selectedProjectId) {
+  const project = office.projects.find(item => item.id === projectId);
+  if (!project) return;
+  const messages = (office.conversations || []).filter(item => item.projectId === project.id).slice().reverse();
+  openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">☷</span><div><p class="eyebrow">${escapeHtml(project.name)}</p><h2>Projektsamtalen</h2><p>Kun dine beskeder, managerens oplæg og registrerede beslutninger.</p></div></div><section class="drawer-section"><div class="conversation-list">${messages.length ? messages.map(item => `<article class="conversation-message ${escapeHtml(item.role)}"><span>${item.role === "mads" ? "Mads" : "Manageren"} · ${escapeHtml(item.kind === "plan" ? "oplæg" : item.kind === "decision" ? "beslutning" : item.kind === "presentation" ? "design" : "besked")}</span><p>${escapeHtml(item.text)}</p><small>${formatTime(item.createdAt)}</small></article>`).join("") : "<div class='empty-state'>Ingen beskeder endnu. Start med at skrive til manageren.</div>"}</div></section><div class="drawer-actions"><button class="drawer-action" data-compose="manager">Skriv til manageren <span>→</span></button></div>`);
+}
+
+function openPresentations(projectId = selectedProjectId) {
+  const project = office.projects.find(item => item.id === projectId);
+  if (!project) return;
+  const presentations = (office.presentations || []).filter(item => item.projectId === project.id);
+  openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">◫</span><div><p class="eyebrow">${escapeHtml(project.name)}</p><h2>Designgennemgange</h2><p>To retninger, tydelige kriterier og managerens anbefaling.</p></div></div><section class="drawer-section"><div class="presentation-list">${presentations.length ? presentations.map(item => `<article class="presentation-card"><span class="decision-type">${item.level === "executive" ? "Direktion" : "Team"}</span><h3>${escapeHtml(item.title)}</h3><div class="design-directions"><section><b>Retning A</b><p>${escapeHtml(item.directionA)}</p></section><section><b>Retning B</b><p>${escapeHtml(item.directionB)}</p></section></div><div class="decision-detail"><b>Vurderingskriterier</b><span>${escapeHtml(item.criteria)}</span></div><div class="decision-detail tradeoff"><b>Managerens anbefaling</b><span>${escapeHtml(item.recommendation)}</span></div></article>`).join("") : "<div class='empty-state'>Ingen designgennemgange endnu. Tilføj kun én, når A og B har et reelt grundlag.</div>"}</div></section><div class="drawer-actions"><button class="drawer-action" data-new-presentation="${escapeHtml(project.id)}">+ Klargør designgennemgang <span>→</span></button></div>`);
 }
 
 function openProfile() {
@@ -260,6 +295,13 @@ function openLibraryDialog(projectId) {
   document.querySelector("#library-dialog").showModal();
 }
 
+function openPresentationDialog(projectId) {
+  const form = document.querySelector("#presentation-form");
+  form.reset();
+  form.elements.projectId.value = projectId;
+  document.querySelector("#presentation-dialog").showModal();
+}
+
 async function createLibraryItem(event) {
   event.preventDefault();
   const form = event.currentTarget;
@@ -272,6 +314,21 @@ async function createLibraryItem(event) {
     document.querySelector("#library-dialog").close();
     openLibrary(projectId);
     showToast("Materialet er gemt. Links bliver ikke hentet automatisk.");
+  } catch (error) { showToast(error.message); }
+}
+
+async function createPresentation(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const projectId = form.elements.projectId.value;
+  try {
+    const result = await api("/api/presentations", { method: "POST", body: JSON.stringify(Object.fromEntries(new FormData(form))) });
+    office = result.office;
+    selectedProjectId = projectId;
+    render();
+    document.querySelector("#presentation-dialog").close();
+    openPresentations(projectId);
+    showToast("Designgennemgangen er lagt i den rigtige beslutningskø.");
   } catch (error) { showToast(error.message); }
 }
 
@@ -363,12 +420,18 @@ drawer.addEventListener("click", event => {
   const ready = event.target.closest("[data-ready-task]");
   const library = event.target.closest("[data-open-library]");
   const newReference = event.target.closest("[data-new-reference]");
+  const conversation = event.target.closest("[data-open-conversation]");
+  const presentations = event.target.closest("[data-open-presentations]");
+  const newPresentation = event.target.closest("[data-new-presentation]");
   if (compose) { closeDrawer(); managerInput.focus(); managerInput.placeholder = `Hvad vil du bede manageren om omkring ${getAgent(compose.dataset.compose)?.name || "denne medarbejder"}?`; }
   if (focus) activateProject(focus.dataset.focusProject);
   if (newTask) openTaskDialog(newTask.dataset.newTask);
   if (ready) readyTask(ready.dataset.readyTask);
   if (library) openLibrary(library.dataset.openLibrary);
   if (newReference) openLibraryDialog(newReference.dataset.newReference);
+  if (conversation) openConversation();
+  if (presentations) openPresentations(presentations.dataset.openPresentations);
+  if (newPresentation) openPresentationDialog(newPresentation.dataset.newPresentation);
 });
 
 const meetingDialog = document.querySelector("#meeting-dialog");
@@ -396,8 +459,11 @@ document.querySelector("#task-dialog-close").addEventListener("click", () => doc
 document.querySelector("#task-form").addEventListener("submit", createTask);
 document.querySelector("#library-dialog-close").addEventListener("click", () => document.querySelector("#library-dialog").close());
 document.querySelector("#library-form").addEventListener("submit", createLibraryItem);
+document.querySelector("#presentation-dialog-close").addEventListener("click", () => document.querySelector("#presentation-dialog").close());
+document.querySelector("#presentation-form").addEventListener("submit", createPresentation);
 document.querySelector("#theme-button").addEventListener("click", () => { document.body.classList.toggle("evening"); showToast(document.body.classList.contains("evening") ? "Aftenstemning slået til." : "Dagslys slået til."); });
 document.querySelector("#profile-button").addEventListener("click", openProfile);
+document.querySelector("#chat-history").addEventListener("click", () => openConversation());
 document.querySelectorAll("[data-nav]").forEach(button => button.addEventListener("click", () => {
   document.querySelectorAll("[data-nav]").forEach(item => item.classList.remove("active"));
   button.classList.add("active");
@@ -408,7 +474,9 @@ document.querySelectorAll("[data-nav]").forEach(button => button.addEventListene
 
 function openInboxDrawer() {
   const decisions = office?.decisions || [];
-  openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">⌁</span><div><p class="eyebrow">Dine beslutninger</p><h2>Venter på Mads</h2><p>Kun de ting, hvor din retning gør en reel forskel.</p></div></div><section class="drawer-section"><div class="mobile-decisions">${decisions.length ? decisions.map(item => `<article class="decision-card"><span class="decision-type">${escapeHtml(item.type)}</span><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.text)}</p><div class="decision-actions"><button data-drawer-decision="${escapeHtml(item.id)}" data-choice="primary">${escapeHtml(item.primary)}</button><button data-drawer-decision="${escapeHtml(item.id)}" data-choice="secondary">${escapeHtml(item.secondary)}</button></div></article>`).join("") : "<div class='empty-state'>Alt er afklaret lige nu.</div>"}</div></section>`);
+  const executive = decisions.filter(item => item.level === "executive");
+  const team = decisions.filter(item => item.level !== "executive");
+  openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">⌁</span><div><p class="eyebrow">Dine beslutninger</p><h2>Venter på Mads</h2><p>Direktionsvalg først; team-afgørelser kan vente, hvis de ikke blokerer.</p></div></div><section class="drawer-section"><div class="mobile-decisions">${decisions.length ? `${decisionGroup("Direktion", "Retning og valg med stor effekt.", executive, true)}${decisionGroup("Team-afgørelser", "Reversible valg, du kan tage senere.", team, true)}` : "<div class='empty-state'>Alt er afklaret lige nu.</div>"}</div></section>`);
 }
 
 drawer.addEventListener("click", event => {

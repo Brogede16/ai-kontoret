@@ -20,6 +20,9 @@ Serveren giver UI'et en lokal, skrivebeskyttet Codex-manager. Den kræver, at Co
 - Fem medarbejderroller med opgavekort, materialer og ærlig status.
 - Managerens fritekstfelt til idéer og feedback, koblet til en lokal, læsebegrænset Codex-manager når serveren kører.
 - En kort indbakke med managerens arbejdsspor og de beslutninger, der venter på Mads.
+- En læsbar projektsamtale med Mads' beskeder, managerens oplæg og registrerede beslutninger — ikke skjulte modeltanker.
+- Et chef-lag med direktionsbeslutninger først og mindre team-afgørelser nedenunder, begge med anbefaling, trade-off og timing.
+- Designgennemgange med to retninger, kriterier og anbefaling. De viser kun det grundlag, der faktisk er leveret.
 - Vedvarende projekter, opgaver, leverancer, acceptkriterier og et fælles bibliotek med noter, briefs og links — gemt lokalt i `data/office-state.json`, som aldrig commit'es.
 - En opgave kan klargøres til en worker, men det starter ikke en model og giver ikke rettigheder.
 - Live-synkronisering på tværs af åbne lokale faner, møde-markeringer, fokus-tilstand, medarbejderpaneler og responsiv mobilnavigation.
@@ -34,10 +37,10 @@ node --test
 
 ## Næste produktlag
 
-1. Tilføj bibliotek med rigtige uploadede filer og projektmateriale.
+1. Tilføj bibliotek med rigtige uploadede filer, previews og projektmateriale.
 2. Lad godkendte worker-forbindelser aflevere artefakter og checks på opgaver.
 3. Kobl Claude Code og Gemini CLI på som særskilte, eksplicit godkendte medarbejdere.
-4. Kobl GitHub-branches, tests, previews og senere Render/Xcode på gennem eksplicitte tilladelser.
+4. Kobl GitHub, tests, previews og senere Render/Xcode på gennem eksplicitte tilladelser.
 
 ## Samarbejde gennem GitHub
 
@@ -49,4 +52,4 @@ GitHub er nu gjort klar som fælles værksted for Mads og andre kodeagenter:
 - Pull requests har en fast afleveringsskabelon.
 - GitHub Actions kører syntakstjek på hver pull request og push til `main`.
 
-En anden AI bør få en konkret GitHub Issue, arbejde i sin egen branch og aflevere en pull request. Den skal ikke skrive direkte til `main`.
+Produktretning, arbejdsaftale og beslutningslog ligger i `docs/`. Mads har godkendt direkte arbejde på `main`; andre AI-medarbejdere skal stadig få en konkret opgave, læse dokumentationen og køre de relevante tests.

@@ -4,7 +4,7 @@ import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { addActivity, createOfficeStore, projectSummary } from "./store.mjs";
+import { addActivity, addConversation, createOfficeStore, projectSummary } from "./store.mjs";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const host = "127.0.0.1";
@@ -47,8 +47,24 @@ function parseBody(raw) {
 function makeId(prefix) { return `${prefix}-${randomUUID().slice(0, 8)}`; }
 function roleName(role) { return ({ manager: "Manageren", designer: "Designeren", researcher: "Researcheren", developer: "Udvikleren", reviewer: "Revieweren" })[role] || role; }
 
+function decisionView(decision) {
+  const level = decision.level === "executive" ? "executive" : "team";
+  const urgency = ["now", "today", "when_ready"].includes(decision.urgency) ? decision.urgency : "when_ready";
+  return {
+    ...decision,
+    level,
+    urgency,
+    recommendation: decision.recommendation || "Manageren anbefaler den beskrevne retning.",
+    tradeoff: decision.tradeoff || "Ingen yderligere trade-off er dokumenteret endnu."
+  };
+}
+
 function officeView(state) {
-  return { ...state, projects: state.projects.map(project => projectSummary(state, project)), decisions: state.decisions.filter(decision => decision.status === "open") };
+  return {
+    ...state,
+    projects: state.projects.map(project => projectSummary(state, project)),
+    decisions: state.decisions.filter(decision => decision.status === "open").map(decisionView)
+  };
 }
 
 async function publish(state) {
@@ -62,7 +78,7 @@ async function mutate(mutator) {
   return outcome;
 }
 
-function managerPrompt(message, project, projectTasks, projectReferences, preferences, previousDecision) {
+function managerPrompt(message, project, projectTasks, projectReferences, conversationHistory, preferences, previousDecision) {
   const projectContext = project ? `Aktivt projekt: ${project.name}. ${project.description}` : "Intet projekt er valgt endnu; afgør om beskeden peger på et nyt projekt eller næste spor.";
   const taskContext = projectTasks.length
     ? `Eksisterende arbejdskø (den er kun planlagt eller klar; intet er startet automatisk):\n${projectTasks.map(task => `- [${task.state}] ${roleName(task.role)}: ${task.title}${task.acceptance ? ` (accept: ${task.acceptance})` : ""}`).join("\n")}`
@@ -70,6 +86,9 @@ function managerPrompt(message, project, projectTasks, projectReferences, prefer
   const referenceContext = projectReferences.length
     ? `Fælles bibliotek (Mads har gemt disse noter eller links; links er ikke hentet eller læst):\n${projectReferences.map(item => `- [${item.type}] ${item.title}: ${item.content}`).join("\n")}`
     : "Fælles bibliotek: intet projektmateriale er gemt endnu.";
+  const conversationContext = conversationHistory.length
+    ? `Seneste læsbare projekthistorik (ikke skjult ræsonnement):\n${[...conversationHistory].reverse().map(item => `- ${item.role === "mads" ? "Mads" : "Manageren"}: ${item.text}`).join("\n")}`
+    : "Projekthistorik: ingen tidligere beskeder.";
   const profile = preferences.map(preference => `- ${preference.value}`).join("\n");
   const decisionContext = previousDecision ? `\nMads svarer på dit tidligere spørgsmål: "${previousDecision.title}". Det tidligere oplæg var: "${previousDecision.text}". Brug hans nye besked som svaret og lav et opdateret spor.` : "";
   return `Du er Manageren i Mads' AI-kontor. Du skal hjælpe Mads med at omsætte en idé til et lille, sikkert arbejdsspor.
@@ -78,6 +97,7 @@ Mads skrev: "${message}"
 ${projectContext}
 ${taskContext}
 ${referenceContext}
+${conversationContext}
 
 Kendte præferencer (bløde signaler, ikke forbud):
 ${profile}
@@ -85,25 +105,42 @@ ${decisionContext}
 
 Returnér KUN et JSON-objekt, der overholder det givne schema. Vælg højst tre roller. Stil kun et spørgsmål, hvis noget vigtigt reelt blokerer næste trin; ellers er question null.
 
+Beslutningsniveau: Vælg "executive" kun for retning, smag med stor effekt, væsentligt omfang, prioritering mellem projekter, offentlighed, økonomi eller noget svært at rulle tilbage. Vælg "team" for et reversibelt, afgrænset valg. recommendation skal være dit klare råd; tradeoff skal forklare hvad Mads giver op eller vinder; urgency er "now", "today" eller "when_ready".
+
 Vigtige regler: Du må ikke påstå, at medarbejdere allerede er startet, at du har set en vedhæftning, læst en ekstern konto, ændret filer eller lavet deploy. Du er kun i læse- og rådgivningstilstand. Lav ikke skjult ræsonnement eller værktøjslog i svaret.`;
 }
 
 function parsePlan(message) {
   try {
     const parsed = JSON.parse(message);
-    if (!parsed.summary || !Array.isArray(parsed.roles) || !parsed.nextAction) throw new Error("mangler felter");
-    return { summary: parsed.summary, roles: parsed.roles, nextAction: parsed.nextAction, question: parsed.question || null };
+    if (!parsed.summary || !Array.isArray(parsed.roles) || !parsed.nextAction || !parsed.decision) throw new Error("mangler felter");
+    return {
+      summary: parsed.summary,
+      roles: parsed.roles,
+      nextAction: parsed.nextAction,
+      question: parsed.question || null,
+      decision: {
+        level: parsed.decision.level === "executive" ? "executive" : "team",
+        title: parsed.decision.title,
+        recommendation: parsed.decision.recommendation,
+        tradeoff: parsed.decision.tradeoff,
+        urgency: parsed.decision.urgency
+      }
+    };
   } catch {
-    return { summary: message.trim(), roles: ["researcher", "designer"], nextAction: "Saml et kort oplæg, før holdet går videre.", question: null };
+    return {
+      summary: message.trim(), roles: ["researcher", "designer"], nextAction: "Saml et kort oplæg, før holdet går videre.", question: null,
+      decision: { level: "team", title: "Godkend næste arbejdsspor", recommendation: "Start med et kort, afgrænset oplæg.", tradeoff: "Det giver mere retning før udførelse, men udskyder selve byggetiden lidt.", urgency: "when_ready" }
+    };
   }
 }
 
-function runManager(message, project, projectTasks, projectReferences, preferences, previousDecision) {
+function runManager(message, project, projectTasks, projectReferences, conversationHistory, preferences, previousDecision) {
   return new Promise((resolve, reject) => {
     const child = spawn("codex", [
       "exec", "--json", "--sandbox", "read-only", "--ephemeral", "--cd", root,
       "--output-schema", join(root, "schemas", "manager-plan.schema.json"),
-      managerPrompt(message, project, projectTasks, projectReferences, preferences, previousDecision)
+      managerPrompt(message, project, projectTasks, projectReferences, conversationHistory, preferences, previousDecision)
     ], { cwd: root, env: { ...process.env, NO_COLOR: "1" } });
 
     let output = "";
@@ -247,6 +284,37 @@ const server = createServer(async (request, response) => {
     } catch (error) { return json(response, 400, { error: error.message || "Materialet kunne ikke gemmes." }); }
   }
 
+  if (request.method === "POST" && url.pathname === "/api/presentations") {
+    try {
+      const body = parseBody(await readBody(request));
+      const outcome = await mutate(state => {
+        const project = state.projects.find(item => item.id === body.projectId);
+        const title = typeof body.title === "string" ? body.title.trim() : "";
+        const directionA = typeof body.directionA === "string" ? body.directionA.trim() : "";
+        const directionB = typeof body.directionB === "string" ? body.directionB.trim() : "";
+        const criteria = typeof body.criteria === "string" ? body.criteria.trim() : "";
+        const recommendation = typeof body.recommendation === "string" ? body.recommendation.trim() : "";
+        const level = body.level === "team" ? "team" : "executive";
+        if (!project || !title || !directionA || !directionB || !criteria) throw new Error("En designgennemgang skal have projekt, titel, to retninger og vurderingskriterier.");
+        if ([title, directionA, directionB, criteria, recommendation].some(value => value.length > 1_200)) throw new Error("En del af designgennemgangen er for lang. Hold hvert felt under 1.200 tegn.");
+        const presentation = { id: makeId("presentation"), projectId: project.id, type: "design", title, directionA, directionB, criteria, recommendation: recommendation || "Ingen anbefaling er skrevet endnu.", level, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        const decision = {
+          id: makeId("decision"), projectId: project.id, type: "Designgennemgang", status: "open", level, urgency: level === "executive" ? "today" : "when_ready",
+          title, text: `Retning A: ${directionA}\n\nRetning B: ${directionB}`, recommendation: presentation.recommendation, tradeoff: criteria,
+          primary: level === "executive" ? "Vælg retning" : "Godkend teamvalg", secondary: "Bed om ny runde", roles: ["designer"], planTaskIds: [], createdAt: new Date().toISOString(), presentationId: presentation.id
+        };
+        presentation.decisionId = decision.id;
+        state.presentations.unshift(presentation);
+        state.decisions.unshift(decision);
+        project.updatedAt = new Date().toISOString();
+        addConversation(state, project.id, "manager", `Designgennemgang klar: ${title}.`, "presentation", presentation.id);
+        addActivity(state, "manager", `Klargjorde designgennemgangen “${title}”.`, project.id, "design");
+        return { presentation, decision };
+      });
+      return json(response, 201, { ok: true, ...outcome.result, office: officeView(outcome.state) });
+    } catch (error) { return json(response, 400, { error: error.message || "Designgennemgangen kunne ikke gemmes." }); }
+  }
+
   if (request.method === "POST" && segments[0] === "api" && segments[1] === "tasks" && segments[3] === "ready") {
     const taskId = segments[2];
     try {
@@ -291,6 +359,7 @@ const server = createServer(async (request, response) => {
             if (agent) { agent.availability = "ready"; agent.status = "Har en opgave klar"; }
           }
         }
+        addConversation(state, decision.projectId, "mads", `${choice === "primary" ? "Godkendte" : "Bad om ny runde på"}: ${decision.title}.`, "decision", decision.id);
         addActivity(state, "manager", choice === "primary" ? `Mads godkendte næste arbejdsspor: ${decision.title}.` : `Mads bad om en ny runde på: ${decision.title}.`, decision.projectId, "decision");
         return decision;
       });
@@ -321,6 +390,7 @@ const server = createServer(async (request, response) => {
       const project = before.projects.find(item => item.id === body.projectId) || before.projects.find(item => item.id === before.activeProjectId) || null;
       const projectTasks = before.tasks.filter(task => task.projectId === project?.id).slice(0, 12);
       const projectReferences = (before.libraryItems || []).filter(item => item.projectId === project?.id).slice(0, 12);
+      const conversationHistory = (before.conversations || []).filter(item => item.projectId === project?.id).slice(0, 12);
       const previousDecision = before.decisions.find(item => item.id === body.decisionId && item.status === "open") || null;
       activeRun = true;
       if (typeof body.decisionId === "string") {
@@ -334,19 +404,26 @@ const server = createServer(async (request, response) => {
         });
       }
       await mutate(state => {
+        addConversation(state, project?.id || state.activeProjectId, "mads", message, "message");
         state.agents.manager.availability = "active";
         state.agents.manager.status = "Tænker over din idé";
         state.agents.manager.task = { title: "Samler et arbejdsspor", description: "Manageren vurderer mål, roller og om noget reelt behøver Mads' beslutning.", progress: 35 };
         addActivity(state, "manager", "Tog imod en ny besked fra Mads og samler et forslag.", project?.id || null, "manager");
       });
-      const result = await runManager(message, project, projectTasks, projectReferences, before.preferences, previousDecision);
+      const result = await runManager(message, project, projectTasks, projectReferences, conversationHistory, before.preferences, previousDecision);
       const outcome = await mutate(state => {
         const planTaskIds = result.plan.roles.map(role => {
           const task = { id: makeId("task"), projectId: project?.id || state.activeProjectId, role, state: "planned", progress: 0, title: `${roleName(role)}: ${roleTaskAction(role, result.plan.nextAction)}`, description: result.plan.summary, acceptance: "Aflever et konkret artefakt, forklar valget og peg på eventuelle beslutninger til Mads.", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
           state.tasks.unshift(task);
           return task.id;
         });
-        const decision = { id: makeId("decision"), projectId: project?.id || state.activeProjectId, type: "Managerens oplæg", status: "open", title: result.plan.question || "Godkend næste arbejdsspor", text: result.plan.summary, primary: result.plan.question ? "Svar manageren" : "Godkend arbejdsspor", secondary: "Bed om ny runde", roles: result.plan.roles, planTaskIds, createdAt: new Date().toISOString(), plan: result.plan };
+        const decision = {
+          id: makeId("decision"), projectId: project?.id || state.activeProjectId, type: result.plan.decision.level === "executive" ? "Direktionsbeslutning" : "Team-afgørelse", status: "open",
+          level: result.plan.decision.level, urgency: result.plan.decision.urgency, title: result.plan.question || result.plan.decision.title,
+          text: result.plan.summary, recommendation: result.plan.decision.recommendation, tradeoff: result.plan.decision.tradeoff,
+          primary: result.plan.question ? "Svar manageren" : result.plan.decision.level === "executive" ? "Tag beslutning" : "Godkend teamvalg",
+          secondary: "Bed om ny runde", roles: result.plan.roles, planTaskIds, createdAt: new Date().toISOString(), plan: result.plan
+        };
         state.decisions.unshift(decision);
         const mutableProject = state.projects.find(item => item.id === decision.projectId);
         if (mutableProject) mutableProject.updatedAt = new Date().toISOString();
@@ -357,6 +434,7 @@ const server = createServer(async (request, response) => {
         manager.message = result.plan.summary;
         manager.artifacts.unshift({ name: "Managerens oplæg", state: "netop nu" });
         manager.artifacts = manager.artifacts.slice(0, 6);
+        addConversation(state, decision.projectId, "manager", result.plan.summary, "plan", decision.id);
         addActivity(state, "manager", `Afleverede et oplæg og klargjorde ${result.plan.roles.length} opgave${result.plan.roles.length === 1 ? "" : "r"}.`, decision.projectId, "manager");
         return { plan: result.plan, decision };
       });

@@ -32,3 +32,18 @@ Hver aflevering skal kort forklare:
 ## GitHub som fælles værksted
 
 GitHub er sandhedskilden for kode, issues, pull requests, checks, projektbeslutninger og dokumentation. En lokal Mac-worker må gøre ting, som kræver Mads' Mac — eksempelvis Xcode-builds — men skal aflevere resultatet tilbage til GitHub.
+
+## Arbejdsrytme og koordinering
+
+- Hold aktivt arbejde lille: ét hovedspor pr. projekt og højst to uafhængige støtte-spor.
+- En parallel opgave skal have en konkret aflevering og en skrevet afhængighed. Hvis designet ændrer kodearbejdet, skal udvikleren afvente den beslutning eller kun bygge et uafhængigt skelet.
+- Manageren samler kun til møde, når der er et reelt konfliktpunkt, en afhængighed eller en beslutning til Mads. Et møde er ikke status-animation.
+- En aflevering flytter ikke automatisk næste led i gang. Den bliver klar til review eller Mads' beslutning, medmindre den konkrete workflow-kontrakt allerede er godkendt.
+
+## Direktion og team-afgørelser
+
+Alle beslutninger skal mærkes som enten `direktion`, `team` eller `hardt_stop`, med anbefaling, trade-off og timing. Teamet kan dokumentere et reversibelt teamvalg; kun Mads kan afgøre direktions- og hårde stop.
+
+## Direkte arbejde på main
+
+Mads har godkendt direkte arbejde på `main` for dette projekt. Kør stadig syntaks- og relevante tests før push, beskriv ændringen tydeligt i committen, og skub aldrig automatisk til deploy, merge af andres ændringer, køb eller publicering.

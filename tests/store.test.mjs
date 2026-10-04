@@ -22,6 +22,8 @@ test("kontorets lokale tilstand overlever en genstart", async () => {
         id: "test-task", projectId: "test-project", role: "researcher", state: "ready", progress: 40, title: "Undersøg retningen", description: "", acceptance: "Tre kilder", createdAt: "2026-10-04T10:00:00.000Z", updatedAt: "2026-10-04T10:00:00.000Z"
       });
       state.libraryItems.unshift({ id: "test-reference", projectId: "test-project", type: "brief", title: "Testbrief", content: "Delt kontekst.", createdAt: "2026-10-04T10:00:00.000Z", updatedAt: "2026-10-04T10:00:00.000Z" });
+      state.conversations.unshift({ id: "test-conversation", projectId: "test-project", role: "mads", kind: "message", text: "Hvad er næste trin?", createdAt: "2026-10-04T10:00:00.000Z" });
+      state.presentations.unshift({ id: "test-presentation", projectId: "test-project", type: "design", title: "Testretninger", directionA: "A", directionB: "B", criteria: "Tydelighed", recommendation: "A", level: "executive", createdAt: "2026-10-04T10:00:00.000Z" });
       state.activeProjectId = "test-project";
     });
 
@@ -30,6 +32,8 @@ test("kontorets lokale tilstand overlever en genstart", async () => {
     assert.equal(restarted.activeProjectId, "test-project");
     assert.equal(restarted.tasks.find(task => task.id === "test-task")?.acceptance, "Tre kilder");
     assert.equal(restarted.libraryItems.find(item => item.id === "test-reference")?.content, "Delt kontekst.");
+    assert.equal(restarted.conversations.find(item => item.id === "test-conversation")?.role, "mads");
+    assert.equal(restarted.presentations.find(item => item.id === "test-presentation")?.level, "executive");
     assert.equal(JSON.parse(await readFile(statePath, "utf8")).projects[0].name, "Testprojekt");
   } finally {
     await rm(directory, { recursive: true, force: true });

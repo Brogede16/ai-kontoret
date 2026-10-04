@@ -60,6 +60,12 @@ test("projekt, bibliotek og opgave flyder gennem den lokale API uden worker-adga
     assert.equal(reference.status, 201);
     assert.equal(reference.body.item.type, "brief");
 
+    const presentation = await request(port, "/api/presentations", "POST", {
+      projectId, level: "executive", title: "Vælg mobilretning", directionA: "Rolig og tekstbåret.", directionB: "Visuel og hurtig.", criteria: "Mobilforståelse og tempo.", recommendation: "Vælg B til første test."
+    });
+    assert.equal(presentation.status, 201);
+    assert.equal(presentation.body.decision.level, "executive");
+
     const task = await request(port, "/api/tasks", "POST", { projectId, role: "developer", title: "Byg første flow", description: "Et lille preview.", acceptance: "Kan gennemgås i browseren." });
     assert.equal(task.status, 201);
     assert.equal(task.body.task.state, "planned");
@@ -68,9 +74,16 @@ test("projekt, bibliotek og opgave flyder gennem den lokale API uden worker-adga
     assert.equal(ready.status, 200);
     assert.equal(ready.body.task.state, "ready");
 
+    const resolved = await request(port, `/api/decisions/${presentation.body.decision.id}/respond`, "POST", { choice: "primary" });
+    assert.equal(resolved.status, 200);
+    assert.equal(resolved.body.decision.status, "resolved");
+
     const office = await request(port, "/api/bootstrap");
     assert.equal(office.body.office.projects[0].id, projectId);
     assert.equal(office.body.office.libraryItems.some(item => item.id === reference.body.item.id), true);
+    assert.equal(office.body.office.presentations.some(item => item.id === presentation.body.presentation.id), true);
+    assert.equal(office.body.office.decisions.some(item => item.id === presentation.body.decision.id), false);
+    assert.equal(office.body.office.conversations.some(item => item.relatedId === presentation.body.decision.id && item.role === "mads"), true);
     assert.equal(office.body.office.tasks.find(item => item.id === task.body.task.id)?.state, "ready");
   } finally {
     if (server?.kill("SIGTERM")) await once(server, "exit");
