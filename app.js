@@ -323,12 +323,15 @@ function openLibrary(projectId = selectedProjectId) {
   openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">▣</span><div><p class="eyebrow">${escapeHtml(project.name)}</p><h2>Fælles bibliotek</h2><p>Projektets registrerede kontekst. Billeder ligger lokalt, men er ikke læst af manageren endnu.</p></div></div><section class="drawer-section"><p class="eyebrow">Projektmateriale</p><ul class="task-list library-list">${items.length ? items.map(item => `<li><span class="task-state ${escapeHtml(item.type)}">${escapeHtml(referenceTypeLabel(item.type))}</span><strong>${escapeHtml(item.title)}</strong>${item.type === "attachment" && item.attachmentId ? `<img class="attachment-preview" src="/api/attachments/${encodeURIComponent(item.attachmentId)}" alt="${escapeHtml(item.title)}" />` : ""}<p class="preserve-lines">${escapeHtml(item.content)}</p><div class="task-actions">${item.url ? `<a class="task-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Åbn link ↗</a>` : ""}<button class="task-link" data-delete-reference="${escapeHtml(item.id)}">Fjern</button></div><small>Gemt ${formatTime(item.createdAt)}</small></li>`).join("") : "<li><p>Ingen fælles kontekst endnu. Gem et brief, en note, et link eller et referencebillede til projektet.</p></li>"}</ul></section><div class="drawer-actions"><button class="drawer-action" data-new-reference="${escapeHtml(project.id)}">+ Gem materiale <span>→</span></button></div>`);
 }
 
-function openActivity() {
-  const rows = office.activity.map(item => {
+function openActivity(scope = "project") {
+  const project = currentProject();
+  const projectOnly = scope === "project" && project;
+  const items = projectOnly ? office.activity.filter(item => item.projectId === project.id || !item.projectId) : office.activity;
+  const rows = items.map(item => {
     const agent = getAgent(item.actorId);
     return `<li>${face(agent, true)}<div><strong>${escapeHtml(agent?.name || "Kontoret")}</strong><p>${escapeHtml(item.text)}</p><small>${formatTime(item.at)}</small></div></li>`;
   }).join("");
-  openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">◷</span><div><p class="eyebrow">Revision af rigtige hændelser</p><h2>Dagens aktivitet</h2><p>Ingen skjulte tanker. Kun handlinger, status og afleveringer.</p></div></div><section class="drawer-section"><ul class="activity-list">${rows}</ul></section>`);
+  openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">◷</span><div><p class="eyebrow">Revision af rigtige hændelser</p><h2>Aktivitet</h2><p>Ingen skjulte tanker. Kun handlinger, status og afleveringer.</p></div></div><div class="scope-toggle" role="group" aria-label="Vis aktivitet for">${project ? `<button data-activity-scope="project" aria-pressed="${Boolean(projectOnly)}">${escapeHtml(project.name)}</button>` : ""}<button data-activity-scope="all" aria-pressed="${!projectOnly}">Alle projekter</button></div><section class="drawer-section"><ul class="activity-list">${rows || "<li><p>Ingen hændelser endnu.</p></li>"}</ul></section>`);
 }
 
 function openConversation(projectId = selectedProjectId) {
@@ -742,6 +745,8 @@ drawer.addEventListener("click", event => {
     managerInput.placeholder = compose.dataset.compose === "manager" ? defaultPlaceholder : `Hvad vil du bede manageren om omkring ${getAgent(compose.dataset.compose)?.name.toLowerCase() || "denne medarbejder"}?`;
   }
   if (openProjectButton) openProject(openProjectButton.dataset.openProject);
+  const scopeButton = event.target.closest("[data-activity-scope]");
+  if (scopeButton) openActivity(scopeButton.dataset.activityScope);
   const editProject = event.target.closest("[data-edit-project]");
   const removeReference = event.target.closest("[data-delete-reference]");
   if (editProject) openProjectEditDialog(editProject.dataset.editProject);
@@ -787,7 +792,7 @@ attachmentInput.addEventListener("change", event => {
   uploadAttachment(file);
   event.target.value = "";
 });
-document.querySelector("#view-activity").addEventListener("click", openActivity);
+document.querySelector("#view-activity").addEventListener("click", () => openActivity());
 document.querySelector("#open-inbox").addEventListener("click", () => {
   if (window.matchMedia("(max-width: 1080px)").matches) return openInboxDrawer();
   document.querySelector(".decision-panel").scrollIntoView({ behavior: "smooth", block: "center" });
@@ -819,7 +824,7 @@ document.querySelectorAll("[data-nav]").forEach(button => button.addEventListene
   button.classList.add("active");
   if (button.dataset.nav === "office") { closeDrawer(); document.querySelector("#office").scrollIntoView({ behavior: "smooth", block: "start" }); }
   if (button.dataset.nav === "projects") document.querySelector("#projects").scrollIntoView({ behavior: "smooth" });
-  if (button.dataset.nav === "history") openActivity();
+  if (button.dataset.nav === "history") openActivity("all");
   if (button.dataset.nav === "library") openLibrary();
   if (button.dataset.nav === "talent") openTalentPool();
   if (button.dataset.nav === "connections") openConnections();

@@ -154,10 +154,15 @@ async function mutate(mutator) {
   return outcome;
 }
 
-function managerPrompt(message, project, projectTasks, projectReferences, conversationHistory, preferences, previousDecision) {
+export function managerPrompt(message, project, projectTasks, projectReferences, conversationHistory, preferences, previousDecision) {
   const projectContext = project ? `Aktivt projekt: ${project.name}. ${project.description}` : "Intet projekt er valgt endnu; afgør om beskeden peger på et nyt projekt eller næste spor.";
+  const taskLine = task => {
+    const by = task.state === "active" ? ` · udføres af ${task.executor || "Mads"}` : "";
+    const artifact = task.state === "done" && task.artifactId ? projectReferences.find(item => item.id === task.artifactId) : null;
+    return `- [${task.state}] ${roleName(task.role)}: ${task.title}${by}${task.acceptance ? ` (accept: ${task.acceptance})` : ""}${artifact ? ` → afleveret: ${artifact.title}` : ""}`;
+  };
   const taskContext = projectTasks.length
-    ? `Eksisterende arbejdskø (den er kun planlagt eller klar; intet er startet automatisk):\n${projectTasks.map(task => `- [${task.state}] ${roleName(task.role)}: ${task.title}${task.acceptance ? ` (accept: ${task.acceptance})` : ""}`).join("\n")}`
+    ? `Arbejdskø (planned/ready er ikke startet; active udføres af den nævnte person eller agent uden for kontoret; done er afleveret med et artefakt):\n${projectTasks.map(taskLine).join("\n")}`
     : "Arbejdskø: ingen konkrete opgaver endnu.";
   const referenceContext = projectReferences.length
     ? `Fælles bibliotek (Mads har gemt disse noter eller links; links er ikke hentet eller læst, og gemte billeder er ikke set):\n${projectReferences.map(item => `- [${item.type}] ${item.title}: ${item.type === "attachment" ? "Et lokalt billede er gemt, men er ikke læst af manageren." : item.content}`).join("\n")}`
@@ -510,7 +515,7 @@ const server = createServer(async (request, response) => {
       if (message.length > maxMessageLength) return json(response, 400, { error: "Hold beskeden under 2.500 tegn." });
       const before = await store.snapshot();
       const project = before.projects.find(item => item.id === body.projectId) || before.projects.find(item => item.id === before.activeProjectId) || null;
-      const projectTasks = before.tasks.filter(task => task.projectId === project?.id).slice(0, 12);
+      const projectTasks = before.tasks.filter(task => task.projectId === project?.id && task.state !== "dropped").slice(0, 12);
       const projectReferences = (before.libraryItems || []).filter(item => item.projectId === project?.id).slice(0, 12);
       const conversationHistory = (before.conversations || []).filter(item => item.projectId === project?.id).slice(0, 12);
       const previousDecision = before.decisions.find(item => item.id === body.decisionId && item.status === "open") || null;

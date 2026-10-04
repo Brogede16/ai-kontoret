@@ -68,3 +68,6 @@ body.evening .plant { color:#3f7350; }
 .project-card.is-resting { opacity:.62; }
 .project-card.is-resting:hover { opacity:1; }
 .inline-link { padding:0; font-size:inherit; letter-spacing:inherit; text-transform:none; }
+.scope-toggle { display:flex; gap:6px; margin-top:18px; }
+.scope-toggle button { border:1px solid var(--line); border-radius:999px; padding:6px 11px; background:#fffefa; color:#5c7168; font:700 9px "DM Mono",monospace; cursor:pointer; }
+.scope-toggle button[aria-pressed="true"] { background:var(--ink); border-color:var(--ink); color:#fff; }

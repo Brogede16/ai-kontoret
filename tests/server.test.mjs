@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { createSeedState } from "../store.mjs";
-import { parsePlan } from "../server.mjs";
+import { managerPrompt, parsePlan } from "../server.mjs";
 
 function startTestServer(port, statePath, codexBin = "ai-kontoret-codex-findes-ikke") {
   const child = spawn(process.execPath, ["server.mjs"], {
@@ -307,3 +307,14 @@ test("et projekt kan omdøbes og sættes på pause, og materiale kan fjernes", (
   assert.equal(removed.body.office.attachments.some(item => item.id === uploaded.body.attachment.id), false);
   assert.equal((await fetch(`http://127.0.0.1:${port}/api/attachments/${uploaded.body.attachment.id}`)).status, 404);
 }));
+
+test("managerens kontekst skelner mellem planlagt, i gang og afleveret arbejde", () => {
+  const tasks = [
+    { state: "active", role: "developer", title: "Byg flow", executor: "Claude Code" },
+    { state: "done", role: "designer", title: "To retninger", artifactId: "ref-1" }
+  ];
+  const references = [{ id: "ref-1", type: "artifact", title: "Retning A og B", content: "Tjekket: set på mobil" }];
+  const prompt = managerPrompt("Hvad nu?", { name: "Test", description: "" }, tasks, references, [], [], null);
+  assert.match(prompt, /Byg flow · udføres af Claude Code/);
+  assert.match(prompt, /To retninger → afleveret: Retning A og B/);
+});
