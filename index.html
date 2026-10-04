@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="da">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#162e2c" />
+    <title>Mads' AI-kontor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primær navigation">
+        <a class="brand" href="#office" aria-label="AI-kontoret, forside">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>AI-kontoret<small>Mads' studio</small></span>
+        </a>
+
+        <nav class="main-nav">
+          <button class="nav-item active" data-nav="office"><span>⌂</span> Kontoret</button>
+          <button class="nav-item" data-nav="projects"><span>▦</span> Projekter <b>3</b></button>
+          <button class="nav-item" data-nav="library"><span>⌘</span> Bibliotek</button>
+          <button class="nav-item" data-nav="history"><span>◷</span> Historik</button>
+        </nav>
+
+        <section class="today-card">
+          <p class="eyebrow">Dagens fokus</p>
+          <strong>Koncert-app</strong>
+          <span>3 opgaver i gang</span>
+          <div class="tiny-progress"><i></i></div>
+        </section>
+
+        <button class="profile-button" id="profile-button">
+          <span class="avatar">M</span>
+          <span><strong>Mads</strong><small>Chef · online</small></span>
+          <span aria-hidden="true">···</span>
+        </button>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Lørdag, 4. oktober</p>
+            <h1>Godmorgen, Mads <span aria-hidden="true">✦</span></h1>
+          </div>
+          <div class="top-actions">
+            <div class="office-status"><i></i><span>Kontoret arbejder</span></div>
+            <button class="icon-button" id="theme-button" aria-label="Skift stemning">☼</button>
+            <button class="icon-button" id="open-inbox" aria-label="Åbn indbakke">⌁<b id="inbox-count">2</b></button>
+          </div>
+        </header>
+
+        <section class="command-bar" aria-label="Skriv til manageren">
+          <div class="manager-mini"><span class="agent-face manager-face">M</span><span>Manageren</span></div>
+          <form id="manager-form">
+            <input id="manager-input" autocomplete="off" placeholder="Hvad skal holdet arbejde på?" aria-label="Besked til manageren" />
+            <button type="button" class="attach-button" id="attach-button" aria-label="Vedhæft et billede eller en fil">＋</button>
+            <button type="submit" class="send-button" aria-label="Send besked">↑</button>
+          </form>
+          <button class="voice-button" aria-label="Indtal besked">◉</button>
+        </section>
+
+        <section class="office-layout">
+          <section class="office-stage" id="office" aria-label="Det levende AI-kontor">
+            <div class="stage-header">
+              <div>
+                <p class="eyebrow">Stueetage · live</p>
+                <h2>Det levende kontor</h2>
+              </div>
+              <div class="stage-controls">
+                <button class="small-button" id="focus-button">✦ Fokus-tilstand</button>
+                <button class="small-button outline" id="meeting-button">○ Kald møde</button>
+              </div>
+            </div>
+
+            <div class="office-map" id="office-map">
+              <div class="room-label team-label">Produkt &amp; kode</div>
+              <div class="room-label research-label">Research</div>
+              <div class="room-label meeting-label">Møderum</div>
+              <div class="room-label lounge-label">Bibliotek</div>
+
+              <button class="desk agent-card manager" data-agent="manager" style="--x: 7%; --y: 25%;" aria-label="Åbn Manageren">
+                <span class="agent-face manager-face">M</span>
+                <span class="presence"><i></i> Planlægger</span>
+                <strong>Manageren</strong>
+                <small>Samler dagens arbejde</small>
+                <span class="desk-shadow"></span>
+              </button>
+
+              <button class="desk agent-card designer" data-agent="designer" style="--x: 37%; --y: 23%;" aria-label="Åbn designeren">
+                <span class="agent-face designer-face">D</span>
+                <span class="presence"><i></i> Skitserer</span>
+                <strong>Designeren</strong>
+                <small>UI-retning B</small>
+                <span class="desk-shadow"></span>
+              </button>
+
+              <button class="desk agent-card researcher" data-agent="researcher" style="--x: 68%; --y: 23%;" aria-label="Åbn researcheren">
+                <span class="agent-face researcher-face">R</span>
+                <span class="presence"><i></i> Undersøger</span>
+                <strong>Researcheren</strong>
+                <small>Koncertpublikum</small>
+                <span class="desk-shadow"></span>
+              </button>
+
+              <button class="desk agent-card developer" data-agent="developer" style="--x: 23%; --y: 63%;" aria-label="Åbn udvikleren">
+                <span class="agent-face developer-face">U</span>
+                <span class="presence"><i></i> Bygger</span>
+                <strong>Udvikleren</strong>
+                <small>Onboarding-flow</small>
+                <span class="desk-shadow"></span>
+              </button>
+
+              <button class="desk agent-card reviewer" data-agent="reviewer" style="--x: 53%; --y: 65%;" aria-label="Åbn revieweren">
+                <span class="agent-face reviewer-face">Q</span>
+                <span class="presence waiting"><i></i> Venter</span>
+                <strong>Revieweren</strong>
+                <small>Klar til næste review</small>
+                <span class="desk-shadow"></span>
+              </button>
+
+              <button class="meeting-table" id="table-button" aria-label="Åbn møderummet">
+                <span>✦</span><strong>Idé-møde</strong><small>Klar når I er</small>
+              </button>
+              <div class="plant plant-one" aria-hidden="true">♧</div>
+              <div class="plant plant-two" aria-hidden="true">♧</div>
+              <div class="bookshelf" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+            </div>
+
+            <div class="office-footer">
+              <span><i class="status-dot"></i> 4 arbejder · 1 klar</span>
+              <button id="view-activity">Se dagens aktivitet <span>→</span></button>
+            </div>
+          </section>
+
+          <aside class="decision-panel" id="decision-panel" aria-label="Venter på Mads">
+            <div class="panel-heading">
+              <div><p class="eyebrow">Din indbakke</p><h2>Venter på Mads</h2></div>
+              <span class="count-badge" id="panel-count">2</span>
+            </div>
+            <p class="panel-intro">Manageren har filtreret dagens arbejde til de ting, hvor din retning gør en forskel.</p>
+            <div id="decision-list" class="decision-list"></div>
+            <button class="see-all" id="see-all">Se hele indbakken <span>→</span></button>
+          </aside>
+        </section>
+
+        <section class="projects-section" id="projects">
+          <div class="section-heading">
+            <div><p class="eyebrow">På tværs af holdet</p><h2>Projekter</h2></div>
+            <button class="new-project" id="new-project">＋ Nyt projekt</button>
+          </div>
+          <div class="project-grid" id="project-grid"></div>
+        </section>
+      </main>
+    </div>
+
+    <aside class="detail-drawer" id="detail-drawer" aria-label="Medarbejderdetaljer" aria-hidden="true">
+      <button class="drawer-close" id="drawer-close" aria-label="Luk">×</button>
+      <div id="drawer-content"></div>
+    </aside>
+    <div class="scrim" id="scrim"></div>
+
+    <dialog id="meeting-dialog">
+      <button class="dialog-close" id="dialog-close" aria-label="Luk møde">×</button>
+      <p class="eyebrow">Managerens forslag</p>
+      <h2>Et kort designmøde?</h2>
+      <p>Designeren har to retninger, og researcheren har fundet et mønster i målgruppen. Et møde samler det til ét oplæg til dig.</p>
+      <div class="meeting-members"><span class="agent-face manager-face">M</span><span class="agent-face designer-face">D</span><span class="agent-face researcher-face">R</span></div>
+      <button class="primary-action" id="start-meeting">Start møde <span>→</span></button>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>
