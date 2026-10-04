@@ -45,7 +45,7 @@ test("kontorets lokale tilstand overlever en genstart", async () => {
   }
 });
 
-test("projektoversigten tæller status og gennemsnitlig fremdrift", () => {
+test("projektoversigten tæller status og fremdrift som andel afleverede opgaver", () => {
   const state = {
     tasks: [
       { projectId: "project-a", state: "active", progress: 60 },
@@ -57,6 +57,6 @@ test("projektoversigten tæller status og gennemsnitlig fremdrift", () => {
   const summary = projectSummary(state, { id: "project-a", name: "A" });
   assert.deepEqual(
     { taskCount: summary.taskCount, activeCount: summary.activeCount, readyCount: summary.readyCount, doneCount: summary.doneCount, progress: summary.progress },
-    { taskCount: 3, activeCount: 1, readyCount: 1, doneCount: 1, progress: 63 }
+    { taskCount: 3, activeCount: 1, readyCount: 1, doneCount: 1, progress: 33 }
   );
 });

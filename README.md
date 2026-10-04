@@ -37,7 +37,8 @@ Serveren lytter kun på `127.0.0.1`, men det alene beskytter ikke mod andre hjem
 - Designgennemgange med to retninger, kriterier og anbefaling. De viser kun det grundlag, der faktisk er leveret.
 - Vedvarende projekter, opgaver, leverancer, acceptkriterier og et fælles bibliotek med noter, briefs og links — gemt lokalt i `data/office-state.json`, som aldrig commit'es.
 - Lokale referencebilleder (PNG, JPEG, WebP eller GIF op til 2 MB) kan vedhæftes til et projekt og vises i biblioteket. De gemmes under `data/uploads/`, bliver ikke commit'et og er ikke læst af manageren eller sendt til en model.
-- En opgave kan klargøres til en worker, men det starter ikke en model og giver ikke rettigheder.
+- En opgave har et ærligt livsforløb: planlagt → klar → i gang → afleveret. "I gang" kræver, at man skriver hvem der udfører den (Mads eller en agent uden for kontoret), fordi kontoret aldrig selv starter en model. En aflevering kræver et artefakt — et link/en placering eller en beskrivelse af tjekket — og gemmes i biblioteket. Skal Mads se den, lander den i indbakken, hvor han kan godkende eller sende den tilbage.
+- Projektets fremdrift er andelen af afleverede opgaver, ikke et gennemsnit af gættede procenter.
 - Skrivebordenes status udledes af de rigtige opgaver (i gang, klar, planlagt). En rolle uden opgaver står som ledig, ikke som travl.
 - Specialister fra talentbanken vises i kontoret, når de er sat på det aktive projekt — tydeligt markeret som ikke forbundet.
 - "Bed om ny runde" fravælger oplæggets planlagte opgaver, så de ikke bliver liggende som spøgelsesarbejde.

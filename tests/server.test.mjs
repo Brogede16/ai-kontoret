@@ -235,3 +235,43 @@ test("managerens oplæg bliver til planlagte opgaver og erstatter et besvaret sp
     assert.equal(office.agents.manager.availability, "ready");
   }, seed, fakeCodex);
 });
+
+test("en opgave går fra klar til i gang til afleveret med et artefakt", async () => {
+  const seed = createSeedState();
+  const at = "2026-10-04T10:00:00.000Z";
+  seed.tasks.unshift({ id: "task-flow", projectId: "ai-office", role: "designer", state: "ready", progress: 0, title: "To UI-retninger", description: "", acceptance: "", createdAt: at, updatedAt: at });
+  await withServer(async port => {
+    const early = await request(port, "/api/tasks/task-flow/deliver", "POST", { title: "Uden indhold" });
+    assert.equal(early.status, 400);
+
+    const started = await request(port, "/api/tasks/task-flow/start", "POST", { executor: "Claude Code" });
+    assert.equal(started.status, 200);
+    assert.equal(started.body.task.state, "active");
+    assert.equal(started.body.task.executor, "Claude Code");
+    assert.equal(started.body.office.agents.designer.workload.active, 1);
+    assert.equal((await request(port, "/api/tasks/task-flow/start", "POST", {})).status, 400);
+
+    const delivered = await request(port, "/api/tasks/task-flow/deliver", "POST", { title: "Retning A og B", location: "https://github.com/eksempel/pr/1", check: "Set på mobil.", forMads: "Vælg mellem A og B." });
+    assert.equal(delivered.status, 200);
+    assert.equal(delivered.body.task.state, "done");
+    assert.equal(delivered.body.item.type, "artifact");
+    assert.equal(delivered.body.item.url, "https://github.com/eksempel/pr/1");
+    assert.equal(delivered.body.office.decisions[0].deliveryTaskId, "task-flow");
+    assert.equal(delivered.body.office.projects.find(item => item.id === "ai-office").doneCount >= 1, true);
+
+    const sentBack = await request(port, `/api/decisions/${delivered.body.decision.id}/respond`, "POST", { choice: "secondary" });
+    assert.equal(sentBack.status, 200);
+    assert.equal(sentBack.body.office.tasks.find(item => item.id === "task-flow").state, "active");
+    assert.equal(sentBack.body.office.libraryItems.some(item => item.id === delivered.body.item.id), true);
+  }, seed);
+});
+
+test("en åben opgave kan fravælges, men en afleveret kan ikke", async () => {
+  const seed = createSeedState();
+  await withServer(async port => {
+    const dropped = await request(port, "/api/tasks/task-review-command-center/drop", "POST", {});
+    assert.equal(dropped.status, 200);
+    assert.equal(dropped.body.task.state, "dropped");
+    assert.equal((await request(port, "/api/tasks/task-command-center/drop", "POST", {})).status, 400);
+  }, seed);
+});

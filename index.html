@@ -204,6 +204,34 @@
       </form>
     </dialog>
 
+    <dialog id="start-dialog">
+      <button class="dialog-close" data-close-dialog aria-label="Luk">×</button>
+      <p class="eyebrow">Sæt opgave i gang</p>
+      <h2>Hvem udfører den?</h2>
+      <p>Kontoret starter ikke selv en model. Skriv, hvem der faktisk arbejder på opgaven — dig eller en agent uden for kontoret — så status er sand.</p>
+      <form id="start-form" class="project-form">
+        <input type="hidden" name="taskId" />
+        <label>Udføres af<input name="executor" list="executor-options" maxlength="80" placeholder="Fx Mads, Claude Code i terminalen" /></label>
+        <datalist id="executor-options"><option value="Mads"></option><option value="Claude Code"></option><option value="ChatGPT / Codex"></option><option value="Gemini CLI"></option></datalist>
+        <button class="primary-action" type="submit">Markér som i gang <span>→</span></button>
+      </form>
+    </dialog>
+
+    <dialog id="deliver-dialog">
+      <button class="dialog-close" data-close-dialog aria-label="Luk">×</button>
+      <p class="eyebrow">Aflevering</p>
+      <h2>Hvad blev leveret?</h2>
+      <p>En aflevering er et artefakt, ikke en påstand. Den gemmes i projektets bibliotek og lukker opgaven.</p>
+      <form id="deliver-form" class="project-form">
+        <input type="hidden" name="taskId" />
+        <label>Artefakt<input name="title" required maxlength="160" placeholder="Fx Mobil-onboarding, retning B" /></label>
+        <label>Link eller placering<input name="location" maxlength="600" placeholder="https://github.com/… eller mappen på Mac'en" /></label>
+        <label>Hvordan er det tjekket?<textarea name="check" maxlength="1200" placeholder="Fx node --test grøn, set på iPhone, tre kilder krydstjekket."></textarea></label>
+        <label>Venter noget på Mads? <small class="field-hint">Udfyld kun, hvis du skal se det. Så lander det i indbakken.</small><textarea name="forMads" maxlength="600" placeholder="Lad stå tomt, hvis afleveringen ikke kræver din beslutning."></textarea></label>
+        <button class="primary-action" type="submit">Gem aflevering <span>→</span></button>
+      </form>
+    </dialog>
+
     <dialog id="library-dialog">
       <button class="dialog-close" id="library-dialog-close" aria-label="Luk fælles bibliotek">×</button>
       <p class="eyebrow">Fælles bibliotek</p>

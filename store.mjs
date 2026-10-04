@@ -171,7 +171,8 @@ export function projectSummary(state, project) {
   const active = tasks.filter(task => task.state === "active").length;
   const ready = tasks.filter(task => task.state === "ready").length;
   const done = tasks.filter(task => task.state === "done").length;
-  const progress = tasks.length ? Math.round(tasks.reduce((total, task) => total + task.progress, 0) / tasks.length) : 0;
+  // Fremdrift er andelen af afleverede opgaver. Procenter, som ingen har målt, bliver ikke gennemsnitsberegnet.
+  const progress = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
   return { ...project, taskCount: tasks.length, activeCount: active, readyCount: ready, doneCount: done, progress };
 }
 

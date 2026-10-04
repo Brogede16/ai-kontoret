@@ -54,3 +54,14 @@ body.evening .plant { color:#3f7350; }
 .meeting-table { top:52%; }
 .meeting-label { display:none; }
 @media (max-width:760px) { .desk { min-height:118px; padding-bottom:24px; } .presence { left:9px; bottom:8px; } .meeting-table { top:53%; } .desk.reviewer { --y: 72% !important; } }
+
+/* Opgavens livsforløb */
+.task-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
+.task-actions .task-ready { margin:0; }
+.task-link { border:0; background:transparent; padding:6px 4px; color:#5c7168; font:700 9px "DM Mono",monospace; text-decoration:underline; text-underline-offset:2px; cursor:pointer; display:inline-block; }
+.task-state.done { background:#e4f1e9; color:#2f6b55; }
+.task-state.artifact { background:#e4f1e9; color:#2f6b55; }
+.task-list li.is-done { background:#fafbf6; }
+.task-list li.is-done strong { color:#53685f; }
+.preserve-lines { white-space:pre-line; }
+.field-hint { display:block; font-weight:500; color:var(--muted); font-size:10px; margin-top:2px; }

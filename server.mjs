@@ -466,7 +466,14 @@ const server = createServer(async (request, response) => {
           task.updatedAt = decision.resolvedAt;
           if (choice === "primary") markAgentReady(state.agents[task.role]);
         }
-        addConversation(state, decision.projectId, "mads", `${choice === "primary" ? "Godkendte" : "Bad om ny runde på"}: ${decision.title}.`, "decision", decision.id);
+        const delivered = decision.deliveryTaskId && state.tasks.find(item => item.id === decision.deliveryTaskId);
+        if (delivered && choice === "secondary" && delivered.state === "done") {
+          // Sendt tilbage: opgaven er åben igen, artefaktet bliver liggende som historik.
+          delivered.state = "active";
+          delivered.progress = 0;
+          delivered.updatedAt = decision.resolvedAt;
+        }
+        addConversation(state, decision.projectId, "mads", `${choice === "primary" ? "Godkendte" : delivered ? "Sendte tilbage" : "Bad om ny runde på"}: ${decision.title}.`, "decision", decision.id);
         addActivity(state, "manager", choice === "primary" ? `Mads godkendte næste arbejdsspor: ${decision.title}.` : `Mads bad om en ny runde på: ${decision.title}.`, decision.projectId, "decision");
         return decision;
       });
@@ -575,9 +582,83 @@ const server = createServer(async (request, response) => {
     }
   }
 
+  if (request.method === "POST" && segments[0] === "api" && segments[1] === "tasks" && ["start", "deliver", "drop"].includes(segments[3])) {
+    const taskId = segments[2];
+    const action = segments[3];
+    try {
+      const body = parseBody(await readBody(request));
+      const outcome = await mutate(state => {
+        const task = state.tasks.find(item => item.id === taskId);
+        if (!task) throw new Error("Opgaven findes ikke længere.");
+        const at = new Date().toISOString();
+        const project = state.projects.find(item => item.id === task.projectId);
+        if (action === "start") return startTask(state, task, body, at);
+        if (action === "deliver") return deliverTask(state, task, project, body, at);
+        if (!openTaskStates.has(task.state)) throw new Error("Kun åbne opgaver kan fravælges.");
+        task.state = "dropped";
+        task.updatedAt = at;
+        addActivity(state, "manager", `Fravalgte “${task.title}”.`, task.projectId, "task");
+        return { task };
+      });
+      return json(response, 200, { ok: true, ...outcome.result, office: officeView(outcome.state) });
+    } catch (error) { return json(response, 400, { error: error.message || "Opgaven kunne ikke opdateres." }); }
+  }
+
   if (request.method === "GET") return serveStatic(url.pathname, response);
   return json(response, 405, { error: "Metoden er ikke tilladt." });
 });
+
+function cleanText(value, max) {
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+// "I gang" registrerer, hvem der faktisk arbejder på opgaven — Mads selv eller en agent uden for kontoret.
+// Kontoret starter aldrig selv en model, så der skal altid stå et menneskeligt eller eksternt navn på.
+function startTask(state, task, body, at) {
+  if (task.state !== "ready") throw new Error("Kun klargjorte opgaver kan sættes i gang.");
+  task.state = "active";
+  task.executor = cleanText(body.executor, 80) || "Mads";
+  task.startedAt = at;
+  task.updatedAt = at;
+  addActivity(state, task.role, `“${task.title}” er i gang · udføres af ${task.executor}.`, task.projectId, "task");
+  return { task };
+}
+
+// En aflevering er et artefakt, ikke en påstand: den kræver en titel og enten et link/en placering eller en beskrivelse af tjekket.
+function deliverTask(state, task, project, body, at) {
+  if (!["ready", "active"].includes(task.state)) throw new Error("Kun klargjorte eller igangværende opgaver kan afleveres.");
+  const title = cleanText(body.title, 160);
+  const location = cleanText(body.location, 600);
+  const check = cleanText(body.check, 1_200);
+  const forMads = cleanText(body.forMads, 600);
+  if (!title || (!location && !check)) throw new Error("En aflevering skal have en titel og enten et link/en placering eller en beskrivelse af, hvordan den er tjekket.");
+  const item = {
+    id: makeId("reference"), projectId: task.projectId, type: "artifact", title,
+    content: [check && `Tjekket: ${check}`, location && `Placering: ${location}`].filter(Boolean).join("\n"),
+    url: /^https?:\/\//i.test(location) ? location : null, taskId: task.id, createdAt: at, updatedAt: at
+  };
+  state.libraryItems.unshift(item);
+  task.state = "done";
+  task.progress = 100;
+  task.artifactId = item.id;
+  task.deliveredAt = at;
+  task.updatedAt = at;
+  if (project) project.updatedAt = at;
+  let decision = null;
+  if (forMads) {
+    decision = {
+      id: makeId("decision"), projectId: task.projectId, type: "Aflevering", status: "open", level: "team", urgency: "today",
+      title: `Aflevering: ${title}`, text: forMads, recommendation: "Se artefaktet i biblioteket og godkend, eller send det tilbage med en kort note.",
+      tradeoff: check || "Tjekket er ikke beskrevet.", primary: "Godkend aflevering", secondary: "Send tilbage",
+      roles: [task.role], planTaskIds: [], deliveryTaskId: task.id, createdAt: at
+    };
+    state.decisions.unshift(decision);
+  }
+  const by = task.executor || "Mads";
+  addConversation(state, task.projectId, "manager", `Aflevering på ${roleName(task.role).toLowerCase()}s spor: “${title}” · udført af ${by}${forMads ? ". Venter på dit blik." : "."}`, "delivery", task.id);
+  addActivity(state, task.role, `“${title}” er afleveret til “${task.title}” · udført af ${by}.`, task.projectId, "delivery");
+  return { task, item, decision };
+}
 
 function markAgentReady(agent) {
   if (!agent || agent.availability === "active") return;

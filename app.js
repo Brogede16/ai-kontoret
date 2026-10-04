@@ -63,6 +63,7 @@ function availabilityLabel(agent) {
 function deskStatus(agent) {
   const work = agent.workload || {};
   if (agent.availability === "active") return { label: "Arbejder", line: agent.task?.title || agent.status, waiting: false };
+  if (work.active) return { label: "I gang", line: work.next?.title || "Opgave i gang", waiting: false };
   if (work.ready) return { label: `${work.ready} klar`, line: work.next?.title || "Opgave klar", waiting: false };
   if (work.planned) return { label: `${work.planned} planlagt`, line: work.next?.title || "Afventer din beslutning", waiting: true };
   if (agent.availability === "bench") return { label: "Talentbank", line: "Ikke på en opgave", waiting: true };
@@ -250,7 +251,7 @@ function openConnections() {
 }
 
 function stateLabel(task) {
-  return ({ active: "Arbejder", ready: "Klar", planned: "Planlagt", done: "Færdig", blocked: "Blokeret", dropped: "Fravalgt" })[task.state] || "Planlagt";
+  return ({ active: "I gang", ready: "Klar", planned: "Planlagt", done: "Afleveret", blocked: "Blokeret", dropped: "Fravalgt" })[task.state] || "Planlagt";
 }
 
 function openProject(id) {
@@ -266,19 +267,47 @@ function openProject(id) {
     <section class="drawer-section"><p class="eyebrow">Fremdrift</p><div class="task-card"><strong>${project.progress}% samlet</strong><p>${project.activeCount} arbejder nu · ${project.readyCount} opgaver er klar · ${project.taskCount} i alt</p><div class="task-progress"><i style="width:${project.progress}%"></i></div></div></section>
     <section class="drawer-section"><p class="eyebrow">Fælles kontekst</p><div class="library-summary"><strong>${references.length} ${references.length === 1 ? "materiale" : "materialer"}</strong><p>Noter, briefs og links, der følger projektet.</p><button class="task-ready" data-open-library="${escapeHtml(project.id)}">Åbn bibliotek</button></div></section>
     <section class="drawer-section"><p class="eyebrow">Designvalg</p><div class="library-summary"><strong>${presentations.length} ${presentations.length === 1 ? "gennemgang" : "gennemgange"}</strong><p>Konkrete sammenligninger til Mads — aldrig opdigtede previews.</p><button class="task-ready" data-open-presentations="${escapeHtml(project.id)}">Se designgennemgange</button></div></section>
-    <section class="drawer-section"><p class="eyebrow">Arbejdskø</p><h3>Opgaver</h3><ul class="task-list">${tasks.length ? tasks.map(task => `<li><span class="task-state ${escapeHtml(task.state)}">${escapeHtml(stateLabel(task))}</span><strong>${escapeHtml(task.title)}</strong><p>${escapeHtml(task.description || "Ingen ekstra beskrivelse.")}</p>${task.acceptance ? `<p class="task-acceptance"><b>Tjek:</b> ${escapeHtml(task.acceptance)}</p>` : ""}<small>${escapeHtml(getAgent(task.role)?.name || task.role)} · ${task.progress}%</small>${task.state === "planned" ? `<button class="task-ready" data-ready-task="${escapeHtml(task.id)}">Klargør til worker</button>` : ""}</li>`).join("") : "<li><p>Der er ingen opgaver endnu. Skriv til manageren for at lave det første spor.</p></li>"}</ul>${dropped ? `<p class="dropped-note">${dropped} opgave${dropped === 1 ? "" : "r"} fra fravalgte oplæg er skjult.</p>` : ""}</section>
+    <section class="drawer-section"><p class="eyebrow">Arbejdskø</p><h3>Opgaver</h3><ul class="task-list">${tasks.length ? sortTasks(tasks).map(taskItem).join("") : "<li><p>Der er ingen opgaver endnu. Skriv til manageren for at lave det første spor.</p></li>"}</ul>${dropped ? `<p class="dropped-note">${dropped} opgave${dropped === 1 ? "" : "r"} fra fravalgte oplæg er skjult.</p>` : ""}</section>
     <div class="drawer-actions"><button class="drawer-secondary" data-new-presentation="${escapeHtml(project.id)}">+ Designgennemgang</button><button class="drawer-secondary" data-new-task="${escapeHtml(project.id)}">+ Ny opgave</button><button class="drawer-action" data-focus-project="${escapeHtml(project.id)}">Gør til dagens fokus <span>→</span></button></div>`);
 }
 
+const taskOrder = { active: 0, ready: 1, planned: 2, blocked: 3, done: 4 };
+
+function sortTasks(tasks) {
+  return tasks.slice().sort((a, b) => (taskOrder[a.state] ?? 5) - (taskOrder[b.state] ?? 5));
+}
+
+function taskMeta(task) {
+  const role = getAgent(task.role)?.name || task.role;
+  if (task.state === "active") return `${role} · udføres af ${task.executor || "Mads"}`;
+  if (task.state === "done") return `${role} · afleveret ${formatTime(task.deliveredAt || task.updatedAt)}`;
+  return role;
+}
+
+function taskActions(task) {
+  const id = escapeHtml(task.id);
+  const drop = `<button class="task-link" data-drop-task="${id}">Fravælg</button>`;
+  if (task.state === "planned") return `<button class="task-ready" data-ready-task="${id}">Klargør</button>${drop}`;
+  if (task.state === "ready") return `<button class="task-ready" data-start-task="${id}">Sæt i gang</button><button class="task-ready" data-deliver-task="${id}">Aflevér</button>${drop}`;
+  if (task.state === "active") return `<button class="task-ready" data-deliver-task="${id}">Aflevér</button>${drop}`;
+  if (task.state === "done" && task.artifactId) return `<button class="task-link" data-open-library="${escapeHtml(task.projectId)}">Se afleveringen</button>`;
+  return "";
+}
+
+function taskItem(task) {
+  const actions = taskActions(task);
+  return `<li class="is-${escapeHtml(task.state)}"><span class="task-state ${escapeHtml(task.state)}">${escapeHtml(stateLabel(task))}</span><strong>${escapeHtml(task.title)}</strong><p>${escapeHtml(task.description || "Ingen ekstra beskrivelse.")}</p>${task.acceptance ? `<p class="task-acceptance"><b>Tjek:</b> ${escapeHtml(task.acceptance)}</p>` : ""}<small>${escapeHtml(taskMeta(task))}</small>${actions ? `<div class="task-actions">${actions}</div>` : ""}</li>`;
+}
+
 function referenceTypeLabel(type) {
-  return ({ brief: "Brief", note: "Note", link: "Link", attachment: "Billede" })[type] || "Materiale";
+  return ({ brief: "Brief", note: "Note", link: "Link", attachment: "Billede", artifact: "Aflevering" })[type] || "Materiale";
 }
 
 function openLibrary(projectId = selectedProjectId) {
   const project = office.projects.find(item => item.id === projectId);
   if (!project) return;
   const items = (office.libraryItems || []).filter(item => item.projectId === project.id);
-  openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">▣</span><div><p class="eyebrow">${escapeHtml(project.name)}</p><h2>Fælles bibliotek</h2><p>Projektets registrerede kontekst. Billeder ligger lokalt, men er ikke læst af manageren endnu.</p></div></div><section class="drawer-section"><p class="eyebrow">Projektmateriale</p><ul class="task-list library-list">${items.length ? items.map(item => `<li><span class="task-state ${escapeHtml(item.type)}">${escapeHtml(referenceTypeLabel(item.type))}</span><strong>${escapeHtml(item.title)}</strong>${item.type === "attachment" && item.attachmentId ? `<img class="attachment-preview" src="/api/attachments/${encodeURIComponent(item.attachmentId)}" alt="${escapeHtml(item.title)}" />` : ""}<p>${escapeHtml(item.content)}</p><small>Gemt ${formatTime(item.createdAt)}</small></li>`).join("") : "<li><p>Ingen fælles kontekst endnu. Gem et brief, en note, et link eller et referencebillede til projektet.</p></li>"}</ul></section><div class="drawer-actions"><button class="drawer-action" data-new-reference="${escapeHtml(project.id)}">+ Gem materiale <span>→</span></button></div>`);
+  openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">▣</span><div><p class="eyebrow">${escapeHtml(project.name)}</p><h2>Fælles bibliotek</h2><p>Projektets registrerede kontekst. Billeder ligger lokalt, men er ikke læst af manageren endnu.</p></div></div><section class="drawer-section"><p class="eyebrow">Projektmateriale</p><ul class="task-list library-list">${items.length ? items.map(item => `<li><span class="task-state ${escapeHtml(item.type)}">${escapeHtml(referenceTypeLabel(item.type))}</span><strong>${escapeHtml(item.title)}</strong>${item.type === "attachment" && item.attachmentId ? `<img class="attachment-preview" src="/api/attachments/${encodeURIComponent(item.attachmentId)}" alt="${escapeHtml(item.title)}" />` : ""}<p class="preserve-lines">${escapeHtml(item.content)}</p>${item.url ? `<a class="task-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Åbn link ↗</a>` : ""}<small>Gemt ${formatTime(item.createdAt)}</small></li>`).join("") : "<li><p>Ingen fælles kontekst endnu. Gem et brief, en note, et link eller et referencebillede til projektet.</p></li>"}</ul></section><div class="drawer-actions"><button class="drawer-action" data-new-reference="${escapeHtml(project.id)}">+ Gem materiale <span>→</span></button></div>`);
 }
 
 function openActivity() {
@@ -293,7 +322,7 @@ function openConversation(projectId = selectedProjectId) {
   const project = office.projects.find(item => item.id === projectId);
   if (!project) return;
   const messages = (office.conversations || []).filter(item => item.projectId === project.id).slice().reverse();
-  openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">☷</span><div><p class="eyebrow">${escapeHtml(project.name)}</p><h2>Projektsamtalen</h2><p>Kun dine beskeder, managerens oplæg og registrerede beslutninger.</p></div></div><section class="drawer-section"><div class="conversation-list">${messages.length ? messages.map(item => `<article class="conversation-message ${escapeHtml(item.role)}"><span>${item.role === "mads" ? "Mads" : "Manageren"} · ${escapeHtml(item.kind === "plan" ? "oplæg" : item.kind === "decision" ? "beslutning" : item.kind === "presentation" ? "design" : "besked")}</span><p>${escapeHtml(item.text)}</p><small>${formatTime(item.createdAt)}</small></article>`).join("") : "<div class='empty-state'>Ingen beskeder endnu. Start med at skrive til manageren.</div>"}</div></section><div class="drawer-actions"><button class="drawer-action" data-compose="manager">Skriv til manageren <span>→</span></button></div>`);
+  openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">☷</span><div><p class="eyebrow">${escapeHtml(project.name)}</p><h2>Projektsamtalen</h2><p>Kun dine beskeder, managerens oplæg og registrerede beslutninger.</p></div></div><section class="drawer-section"><div class="conversation-list">${messages.length ? messages.map(item => `<article class="conversation-message ${escapeHtml(item.role)}"><span>${item.role === "mads" ? "Mads" : "Manageren"} · ${escapeHtml(item.kind === "plan" ? "oplæg" : item.kind === "decision" ? "beslutning" : item.kind === "presentation" ? "design" : item.kind === "delivery" ? "aflevering" : "besked")}</span><p>${escapeHtml(item.text)}</p><small>${formatTime(item.createdAt)}</small></article>`).join("") : "<div class='empty-state'>Ingen beskeder endnu. Start med at skrive til manageren.</div>"}</div></section><div class="drawer-actions"><button class="drawer-action" data-compose="manager">Skriv til manageren <span>→</span></button></div>`);
 }
 
 function openPresentations(projectId = selectedProjectId) {
@@ -480,6 +509,31 @@ async function createTask(event) {
   } catch (error) { showToast(error.message); }
 }
 
+function openTaskForm(dialogId, taskId) {
+  const form = document.querySelector(`#${dialogId} form`);
+  form.reset();
+  form.elements.taskId.value = taskId;
+  document.querySelector(`#${dialogId}`).showModal();
+}
+
+async function updateTask(taskId, action, payload, message) {
+  try {
+    const result = await api(`/api/tasks/${encodeURIComponent(taskId)}/${action}`, { method: "POST", body: JSON.stringify(payload) });
+    office = result.office;
+    render();
+    openProject(result.task.projectId);
+    showToast(message);
+    return true;
+  } catch (error) { showToast(error.message); return false; }
+}
+
+async function submitTaskForm(event, action, message) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const { taskId, ...payload } = Object.fromEntries(new FormData(form));
+  if (await updateTask(taskId, action, payload, message)) form.closest("dialog").close();
+}
+
 async function readyTask(id) {
   try {
     const result = await api(`/api/tasks/${encodeURIComponent(id)}/ready`, { method: "POST", body: "{}" });
@@ -601,6 +655,12 @@ drawer.addEventListener("click", event => {
     managerInput.placeholder = compose.dataset.compose === "manager" ? defaultPlaceholder : `Hvad vil du bede manageren om omkring ${getAgent(compose.dataset.compose)?.name.toLowerCase() || "denne medarbejder"}?`;
   }
   if (openProjectButton) openProject(openProjectButton.dataset.openProject);
+  const startTaskButton = event.target.closest("[data-start-task]");
+  const deliverTaskButton = event.target.closest("[data-deliver-task]");
+  const dropTaskButton = event.target.closest("[data-drop-task]");
+  if (startTaskButton) openTaskForm("start-dialog", startTaskButton.dataset.startTask);
+  if (deliverTaskButton) openTaskForm("deliver-dialog", deliverTaskButton.dataset.deliverTask);
+  if (dropTaskButton && confirm("Fravælg opgaven? Den forsvinder fra køen, men står i historikken.")) updateTask(dropTaskButton.dataset.dropTask, "drop", {}, "Opgaven er fravalgt.");
   if (focus) activateProject(focus.dataset.focusProject);
   if (newTask) openTaskDialog(newTask.dataset.newTask);
   if (ready) readyTask(ready.dataset.readyTask);
@@ -646,6 +706,9 @@ document.querySelector("#library-dialog-close").addEventListener("click", () => 
 document.querySelector("#library-form").addEventListener("submit", createLibraryItem);
 document.querySelector("#presentation-dialog-close").addEventListener("click", () => document.querySelector("#presentation-dialog").close());
 document.querySelector("#presentation-form").addEventListener("submit", createPresentation);
+document.querySelector("#start-form").addEventListener("submit", event => submitTaskForm(event, "start", "Opgaven står som i gang."));
+document.querySelector("#deliver-form").addEventListener("submit", event => submitTaskForm(event, "deliver", "Afleveringen er gemt i biblioteket."));
+document.querySelectorAll("[data-close-dialog]").forEach(button => button.addEventListener("click", () => button.closest("dialog").close()));
 document.querySelector("#theme-button").addEventListener("click", () => {
   const evening = !document.body.classList.contains("evening");
   applyTheme(evening);
