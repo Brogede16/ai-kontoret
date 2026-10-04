@@ -2,7 +2,7 @@
 
 En første, interaktiv prototype af det grafiske AI-kontor: flere roller, manager-chat, projekter, beslutningsindbakke og et mobiltilpasset kontor.
 
-Denne version er bevidst en lokal UI-prototype. Den bruger demonstrationsdata og foretager ingen modelkald, GitHub-ændringer, deploys eller køb.
+Denne version er bevidst et lokalt, sikkert første kontrolrum. Den gemmer projekter, opgaver, beslutninger og aktivitet på Mac'en. Den kan bede en læse- og rådgivningsbegrænset Codex-manager om et struktureret arbejdsspor, men foretager ikke GitHub-ændringer, deploys, køb eller filændringer på vegne af modeller.
 
 ## Åbn prototypen
 
@@ -17,16 +17,25 @@ Serveren giver UI'et en lokal, skrivebeskyttet Codex-manager. Den kræver, at Co
 ## Det er bygget nu
 
 - Et levende, Game Dev Tycoon-inspireret kontor på desktop og mobil.
-- Fem medarbejderroller med rigtige opgavekort og materialer.
-- Managerens fritekstfelt til nye idéer og feedback, koblet til en lokal Codex-manager når serveren kører.
-- En kort indbakke med beslutninger, der venter på Mads.
-- Projekter og status på tværs af holdet.
-- Møder, fokus-tilstand, medarbejderpaneler og responsiv mobilnavigation.
+- Fem medarbejderroller med opgavekort, materialer og ærlig status.
+- Managerens fritekstfelt til idéer og feedback, koblet til en lokal, læsebegrænset Codex-manager når serveren kører.
+- En kort indbakke med managerens arbejdsspor og de beslutninger, der venter på Mads.
+- Vedvarende projekter, opgaver, leverancer, acceptkriterier og et fælles bibliotek med noter, briefs og links — gemt lokalt i `data/office-state.json`, som aldrig commit'es.
+- En opgave kan klargøres til en worker, men det starter ikke en model og giver ikke rettigheder.
+- Live-synkronisering på tværs af åbne lokale faner, møde-markeringer, fokus-tilstand, medarbejderpaneler og responsiv mobilnavigation.
+
+## Tjek før aflevering
+
+```bash
+node --check app.js
+node --check server.mjs
+node --test
+```
 
 ## Næste produktlag
 
-1. Gem projekter, beslutninger og Mads-præferencer rigtigt.
-2. Lad manageren oprette konkrete opgaver og indsamle artefakter.
+1. Tilføj bibliotek med rigtige uploadede filer og projektmateriale.
+2. Lad godkendte worker-forbindelser aflevere artefakter og checks på opgaver.
 3. Kobl Claude Code og Gemini CLI på som særskilte, eksplicit godkendte medarbejdere.
 4. Kobl GitHub-branches, tests, previews og senere Render/Xcode på gennem eksplicitte tilladelser.
 

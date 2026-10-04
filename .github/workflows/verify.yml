@@ -22,3 +22,5 @@ jobs:
         run: node --check app.js
       - name: Check local worker
         run: node --check server.mjs
+      - name: Check persistent office state
+        run: node --test
