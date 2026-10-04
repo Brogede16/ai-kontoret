@@ -15,7 +15,7 @@ function activity(actorId, text, projectId = null, kind = "status") {
 
 export function createSeedState() {
   return {
-    version: 2,
+    version: 3,
     updatedAt: now(),
     activeProjectId: "ai-office",
     agents: {
@@ -48,6 +48,38 @@ export function createSeedState() {
         availability: "waiting", status: "Venter på en aflevering", task: { title: "Klar til næste review", description: "Tjekker funktion, sprog, mobil-layout og om afleveringen matcher briefen.", progress: 0 },
         artifacts: [{ name: "Review-tjekliste", state: "klar" }, { name: "Test-scenarier", state: "klar" }],
         message: "Jeg går først i gang, når der er noget konkret at teste eller sammenligne med briefen."
+      },
+      game_designer: {
+        id: "game_designer", initial: "S", face: "game-designer-face", name: "Spildesigneren", role: "Gameplay & systemer",
+        availability: "bench", status: "I talentbanken · ikke forbundet", task: { title: "Klar til et spilbrief", description: "Definerer core loop, progression, regler og en spilbar første afgrænsning, når et projekt har brug for det.", progress: 0 },
+        artifacts: [{ name: "Gameplay-loop", state: "kompetencepakke" }, { name: "Systembrief", state: "kompetencepakke" }],
+        competencies: ["Core loop", "Progression", "Spilsystemer", "Spilbar vertikal slice"],
+        handoff: "Afleverer et systembrief og testbare regler til designeren og udvikleren.",
+        message: "Jeg bliver kun sat på, når spilstruktur eller gameplay kan gøre afleveringen væsentligt bedre. Jeg er en rolleprofil, ikke en aktiv model endnu."
+      },
+      graphic_designer: {
+        id: "graphic_designer", initial: "G", face: "graphic-designer-face", name: "Grafikeren", role: "Visuel identitet & assets",
+        availability: "bench", status: "I talentbanken · ikke forbundet", task: { title: "Klar til visuelt brief", description: "Afklarer art direction, asset-briefs og visuelle referencer til direkte kode eller senere billedværktøjer.", progress: 0 },
+        artifacts: [{ name: "Art-direction", state: "kompetencepakke" }, { name: "Asset-brief", state: "kompetencepakke" }],
+        competencies: ["Art direction", "UI-illustration", "Asset-briefs", "Visuelle referencer"],
+        handoff: "Afleverer referencer, et afgrænset asset-brief og kriterier til designeren eller en senere billed-worker.",
+        message: "Jeg kan styrke den visuelle retning, men jeg må ikke udgive, købe assets eller foregive, at et billede er genereret, før en godkendt worker faktisk har leveret det."
+      },
+      copywriter: {
+        id: "copywriter", initial: "T", face: "copywriter-face", name: "Tekstforfatteren", role: "UX-tekst & fortælling",
+        availability: "bench", status: "I talentbanken · ikke forbundet", task: { title: "Klar til tekstbrief", description: "Skriver produkttekst, mikrocopy og tone-of-voice med klare varianter, når det konkrete projekt har brug for det.", progress: 0 },
+        artifacts: [{ name: "Tone-of-voice", state: "kompetencepakke" }, { name: "UX-tekstvarianter", state: "kompetencepakke" }],
+        competencies: ["UX-mikrocopy", "Produktfortælling", "Tone-of-voice", "Tekstvarianter"],
+        handoff: "Afleverer tekstvarianter med formål, målgruppe og anbefaling til designer eller udvikler.",
+        message: "Jeg er her ikke for at fylde skærmen med ord. Jeg bliver hentet ind, når tekst er en del af brugeroplevelsen eller projektets retning."
+      },
+      marketer: {
+        id: "marketer", initial: "K", face: "marketer-face", name: "Marketingpersonen", role: "Positionering & lancering",
+        availability: "bench", status: "I talentbanken · ikke forbundet", task: { title: "Klar til positioneringsbrief", description: "Afklarer målgruppe, værditilbud, launch-hypoteser og hvad der bør testes, før der kommunikeres offentligt.", progress: 0 },
+        artifacts: [{ name: "Positioneringsnotat", state: "kompetencepakke" }, { name: "Launch-hypoteser", state: "kompetencepakke" }],
+        competencies: ["Målgruppe", "Positionering", "Værditilbud", "Launch-hypoteser"],
+        handoff: "Afleverer en målgruppe- og positioneringsnote. Udfører aldrig køb, annoncering eller publicering.",
+        message: "Jeg kan skærpe, hvem produktet er til, og hvordan det forklares. Jeg må aldrig selv udgive, købe annoncer eller starte en kampagne."
       }
     },
     projects: [
@@ -138,10 +170,15 @@ export function createOfficeStore(filePath) {
   async function load() {
     try {
       state = JSON.parse(await readFile(filePath, "utf8"));
+      if (!state.agents || typeof state.agents !== "object") state.agents = {};
+      const seedAgents = createSeedState().agents;
+      for (const [agentId, profile] of Object.entries(seedAgents)) {
+        if (!state.agents[agentId]) state.agents[agentId] = profile;
+      }
       if (!Array.isArray(state.libraryItems)) state.libraryItems = [];
       if (!Array.isArray(state.conversations)) state.conversations = [];
       if (!Array.isArray(state.presentations)) state.presentations = [];
-      state.version = Math.max(Number(state.version) || 1, 2);
+      state.version = Math.max(Number(state.version) || 1, 3);
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
       state = createSeedState();

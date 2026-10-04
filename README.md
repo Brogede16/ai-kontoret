@@ -17,7 +17,8 @@ Serveren giver UI'et en lokal, skrivebeskyttet Codex-manager. Den kræver, at Co
 ## Det er bygget nu
 
 - Et levende, Game Dev Tycoon-inspireret kontor på desktop og mobil.
-- Fem medarbejderroller med opgavekort, materialer og ærlig status.
+- Fem faste medarbejderroller med opgavekort, materialer og ærlig status.
+- En talentbank med spildesigner, grafiker, tekstforfatter og marketingperson. Manageren kan bemande dem pr. projekt, men de er ikke automatisk forbundet til en model eller et værktøj.
 - Managerens fritekstfelt til idéer og feedback, koblet til en lokal, læsebegrænset Codex-manager når serveren kører.
 - En kort indbakke med managerens arbejdsspor og de beslutninger, der venter på Mads.
 - En læsbar projektsamtale med Mads' beskeder, managerens oplæg og registrerede beslutninger — ikke skjulte modeltanker.
@@ -52,4 +53,4 @@ GitHub er nu gjort klar som fælles værksted for Mads og andre kodeagenter:
 - Pull requests har en fast afleveringsskabelon.
 - GitHub Actions kører syntakstjek på hver pull request og push til `main`.
 
-Produktretning, arbejdsaftale og beslutningslog ligger i `docs/`. Mads har godkendt direkte arbejde på `main`; andre AI-medarbejdere skal stadig få en konkret opgave, læse dokumentationen og køre de relevante tests.
+Produktretning, arbejdsaftale, [talentbank](docs/TALENT-BANK.md) og beslutningslog ligger i `docs/`. Mads har godkendt direkte arbejde på `main`; andre AI-medarbejdere skal stadig få en konkret opgave, læse dokumentationen og køre de relevante tests.

@@ -13,6 +13,8 @@ test("kontorets lokale tilstand overlever en genstart", async () => {
     const store = createOfficeStore(statePath);
     const seeded = await store.load();
     assert.equal(seeded.activeProjectId, "ai-office");
+    assert.equal(seeded.agents.graphic_designer.availability, "bench");
+    assert.equal(seeded.agents.game_designer.competencies.includes("Core loop"), true);
 
     await store.mutate(state => {
       state.projects.unshift({

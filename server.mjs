@@ -14,6 +14,7 @@ const maxMessageLength = 2_500;
 const maxRunMs = 120_000;
 const eventClients = new Set();
 let activeRun = false;
+const assignableRoles = new Set(["designer", "researcher", "developer", "reviewer", "game_designer", "graphic_designer", "copywriter", "marketer"]);
 
 const types = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8",
@@ -45,7 +46,7 @@ function parseBody(raw) {
 }
 
 function makeId(prefix) { return `${prefix}-${randomUUID().slice(0, 8)}`; }
-function roleName(role) { return ({ manager: "Manageren", designer: "Designeren", researcher: "Researcheren", developer: "Udvikleren", reviewer: "Revieweren" })[role] || role; }
+function roleName(role) { return ({ manager: "Manageren", designer: "Designeren", researcher: "Researcheren", developer: "Udvikleren", reviewer: "Revieweren", game_designer: "Spildesigneren", graphic_designer: "Grafikeren", copywriter: "Tekstforfatteren", marketer: "Marketingpersonen" })[role] || role; }
 
 function decisionView(decision) {
   const level = decision.level === "executive" ? "executive" : "team";
@@ -103,6 +104,8 @@ Kendte præferencer (bløde signaler, ikke forbud):
 ${profile}
 ${decisionContext}
 
+Tilgængelige specialistroller i talentbanken: Spildesigneren (core loop, progression, systembrief), Grafikeren (art direction, asset-briefs, visuelle referencer), Tekstforfatteren (UX-tekst, tone-of-voice, tekstvarianter) og Marketingpersonen (målgruppe, positionering, launch-hypoteser). Brug kun en specialist, når rollen ændrer den konkrete aflevering. En rolle i talentbanken er ikke en tilsluttet model eller en ny adgang.
+
 Returnér KUN et JSON-objekt, der overholder det givne schema. Vælg højst tre roller. Stil kun et spørgsmål, hvis noget vigtigt reelt blokerer næste trin; ellers er question null.
 
 Beslutningsniveau: Vælg "executive" kun for retning, smag med stor effekt, væsentligt omfang, prioritering mellem projekter, offentlighed, økonomi eller noget svært at rulle tilbage. Vælg "team" for et reversibelt, afgrænset valg. recommendation skal være dit klare råd; tradeoff skal forklare hvad Mads giver op eller vinder; urgency er "now", "today" eller "when_ready".
@@ -116,7 +119,7 @@ function parsePlan(message) {
     if (!parsed.summary || !Array.isArray(parsed.roles) || !parsed.nextAction || !parsed.decision) throw new Error("mangler felter");
     return {
       summary: parsed.summary,
-      roles: parsed.roles,
+      roles: [...new Set(parsed.roles.filter(role => assignableRoles.has(role)))].slice(0, 3),
       nextAction: parsed.nextAction,
       question: parsed.question || null,
       decision: {
@@ -256,6 +259,7 @@ const server = createServer(async (request, response) => {
         if (!project || !title) throw new Error("Vælg et projekt og giv opgaven en titel.");
         const task = { id: makeId("task"), projectId: project.id, role, state: "planned", progress: 0, title, description: String(body.description || "").slice(0, 520), acceptance: String(body.acceptance || "").slice(0, 520), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
         state.tasks.unshift(task);
+        if (!project.people.includes(role)) project.people.push(role);
         project.updatedAt = new Date().toISOString();
         addActivity(state, "manager", `Klargjorde “${task.title}” til ${roleName(role).toLowerCase()}.`, project.id, "task");
         return task;
@@ -412,21 +416,28 @@ const server = createServer(async (request, response) => {
       });
       const result = await runManager(message, project, projectTasks, projectReferences, conversationHistory, before.preferences, previousDecision);
       const outcome = await mutate(state => {
+        const projectId = project?.id || state.activeProjectId;
+        const mutableProject = state.projects.find(item => item.id === projectId);
+        const newlyStaffed = mutableProject
+          ? result.plan.roles.filter(role => !mutableProject.people.includes(role))
+          : [];
+        if (mutableProject) {
+          mutableProject.people.push(...newlyStaffed);
+          mutableProject.updatedAt = new Date().toISOString();
+        }
         const planTaskIds = result.plan.roles.map(role => {
-          const task = { id: makeId("task"), projectId: project?.id || state.activeProjectId, role, state: "planned", progress: 0, title: `${roleName(role)}: ${roleTaskAction(role, result.plan.nextAction)}`, description: result.plan.summary, acceptance: "Aflever et konkret artefakt, forklar valget og peg på eventuelle beslutninger til Mads.", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+          const task = { id: makeId("task"), projectId, role, state: "planned", progress: 0, title: `${roleName(role)}: ${roleTaskAction(role, result.plan.nextAction)}`, description: result.plan.summary, acceptance: "Aflever et konkret artefakt, forklar valget og peg på eventuelle beslutninger til Mads.", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
           state.tasks.unshift(task);
           return task.id;
         });
         const decision = {
-          id: makeId("decision"), projectId: project?.id || state.activeProjectId, type: result.plan.decision.level === "executive" ? "Direktionsbeslutning" : "Team-afgørelse", status: "open",
+          id: makeId("decision"), projectId, type: result.plan.decision.level === "executive" ? "Direktionsbeslutning" : "Team-afgørelse", status: "open",
           level: result.plan.decision.level, urgency: result.plan.decision.urgency, title: result.plan.question || result.plan.decision.title,
           text: result.plan.summary, recommendation: result.plan.decision.recommendation, tradeoff: result.plan.decision.tradeoff,
           primary: result.plan.question ? "Svar manageren" : result.plan.decision.level === "executive" ? "Tag beslutning" : "Godkend teamvalg",
           secondary: "Bed om ny runde", roles: result.plan.roles, planTaskIds, createdAt: new Date().toISOString(), plan: result.plan
         };
         state.decisions.unshift(decision);
-        const mutableProject = state.projects.find(item => item.id === decision.projectId);
-        if (mutableProject) mutableProject.updatedAt = new Date().toISOString();
         const manager = state.agents.manager;
         manager.availability = "ready";
         manager.status = "Har et oplæg klar til Mads";
@@ -435,6 +446,7 @@ const server = createServer(async (request, response) => {
         manager.artifacts.unshift({ name: "Managerens oplæg", state: "netop nu" });
         manager.artifacts = manager.artifacts.slice(0, 6);
         addConversation(state, decision.projectId, "manager", result.plan.summary, "plan", decision.id);
+        if (newlyStaffed.length) addActivity(state, "manager", `Satte ${newlyStaffed.map(role => roleName(role).toLowerCase()).join(", ")} på “${mutableProject.name}”.`, decision.projectId, "staffing");
         addActivity(state, "manager", `Afleverede et oplæg og klargjorde ${result.plan.roles.length} opgave${result.plan.roles.length === 1 ? "" : "r"}.`, decision.projectId, "manager");
         return { plan: result.plan, decision };
       });
@@ -459,7 +471,7 @@ const server = createServer(async (request, response) => {
 });
 
 function roleTaskAction(role, nextAction) {
-  const prefix = { designer: "formgiv", researcher: "undersøg", developer: "gør klar til at bygge", reviewer: "forbered kvalitetstjek af" }[role] || "bearbejd";
+  const prefix = { designer: "formgiv", researcher: "undersøg", developer: "gør klar til at bygge", reviewer: "forbered kvalitetstjek af", game_designer: "afgræns gameplay for", graphic_designer: "læg visuel retning for", copywriter: "formulér tekst til", marketer: "positionér og afgræns" }[role] || "bearbejd";
   return `${prefix} — ${nextAction}`;
 }
 

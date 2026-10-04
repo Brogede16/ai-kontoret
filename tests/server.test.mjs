@@ -70,6 +70,10 @@ test("projekt, bibliotek og opgave flyder gennem den lokale API uden worker-adga
     assert.equal(task.status, 201);
     assert.equal(task.body.task.state, "planned");
 
+    const specialistTask = await request(port, "/api/tasks", "POST", { projectId, role: "graphic_designer", title: "Lav et asset-brief", description: "Saml visuelle referencer.", acceptance: "Et afgrænset brief med kriterier." });
+    assert.equal(specialistTask.status, 201);
+    assert.equal(specialistTask.body.task.role, "graphic_designer");
+
     const ready = await request(port, `/api/tasks/${task.body.task.id}/ready`, "POST", {});
     assert.equal(ready.status, 200);
     assert.equal(ready.body.task.state, "ready");
@@ -85,6 +89,7 @@ test("projekt, bibliotek og opgave flyder gennem den lokale API uden worker-adga
     assert.equal(office.body.office.decisions.some(item => item.id === presentation.body.decision.id), false);
     assert.equal(office.body.office.conversations.some(item => item.relatedId === presentation.body.decision.id && item.role === "mads"), true);
     assert.equal(office.body.office.tasks.find(item => item.id === task.body.task.id)?.state, "ready");
+    assert.equal(office.body.office.projects.find(item => item.id === projectId)?.people.includes("graphic_designer"), true);
   } finally {
     if (server?.kill("SIGTERM")) await once(server, "exit");
     await rm(directory, { recursive: true, force: true });

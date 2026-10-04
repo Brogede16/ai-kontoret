@@ -74,7 +74,7 @@ Denne fil er den korte, menneskelæselige beslutningslog for produktets retning.
 
 ## 012 · Manageren bemander projekter frit inden for talentbanken
 
-**Beslutning:** Manageren kan selv foreslå, tilføje og afvikle roller på et projekt, når det forbedrer den konkrete aflevering. Spildesigner, tekstforfatter og marketingperson er projektroller, der kan hentes ind efter behov — de skal ikke være aktive på alle projekter.
+**Beslutning:** Manageren kan selv foreslå, tilføje og afvikle roller på et projekt, når det forbedrer den konkrete aflevering. Spildesigner, grafiker, tekstforfatter og marketingperson er projektroller, der kan hentes ind efter behov — de skal ikke være aktive på alle projekter.
 
 **Hvorfor:** Det bevarer følelsen af et rigtigt, fleksibelt team, uden at Mads selv skal micromanage hver tildeling.
 

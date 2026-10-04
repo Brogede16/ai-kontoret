@@ -22,6 +22,7 @@
         <nav class="main-nav">
           <button class="nav-item active" data-nav="office"><span>⌂</span> Kontoret</button>
           <button class="nav-item" data-nav="projects"><span>▦</span> Projekter <b>0</b></button>
+          <button class="nav-item" data-nav="talent"><span>✦</span> Talenter</button>
           <button class="nav-item" data-nav="library"><span>⌘</span> Bibliotek</button>
           <button class="nav-item" data-nav="history"><span>◷</span> Historik</button>
         </nav>
@@ -192,7 +193,7 @@
       <p>Opgaven bliver gemt i projektet. Den starter ikke en model eller ændrer noget, før den senere bliver tildelt bevidst.</p>
       <form id="task-form" class="project-form">
         <input type="hidden" name="projectId" />
-        <label>Ansvarlig rolle<select name="role"><option value="manager">Manageren</option><option value="designer">Designeren</option><option value="researcher">Researcheren</option><option value="developer">Udvikleren</option><option value="reviewer">Revieweren</option></select></label>
+        <label>Ansvarlig rolle<select name="role"><option value="manager">Manageren</option><option value="designer">Designeren</option><option value="researcher">Researcheren</option><option value="developer">Udvikleren</option><option value="reviewer">Revieweren</option><option value="game_designer">Spildesigneren · talentbank</option><option value="graphic_designer">Grafikeren · talentbank</option><option value="copywriter">Tekstforfatteren · talentbank</option><option value="marketer">Marketingpersonen · talentbank</option></select></label>
         <label>Opgave<input name="title" required maxlength="160" placeholder="Fx Saml tre UI-retninger" /></label>
         <label>Hvad skal afleveres?<textarea name="description" maxlength="520" placeholder="Kontekst, materiale og konkret resultat."></textarea></label>
         <label>Hvordan ved vi, at den er god?<textarea name="acceptance" maxlength="520" placeholder="Acceptkriterier eller tjek."></textarea></label>

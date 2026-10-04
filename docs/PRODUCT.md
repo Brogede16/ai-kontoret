@@ -46,7 +46,7 @@ Et designvalg skal vises som en **designgennemgang**, ikke som en uunderbygget t
 
 ## Roller er ikke modeller
 
-Manager, designer, researcher, udvikler, reviewer og grafiker er roller. De kan drives af samme model eller af forskellige udbydere, men kun når det giver bedre output. Underliggende modeller må aldrig bestemme produktets organisation.
+Manager, designer, researcher, udvikler, reviewer, spildesigner, grafiker, tekstforfatter og marketingperson er roller. De kan drives af samme model eller af forskellige udbydere, men kun når det giver bedre output. Underliggende modeller må aldrig bestemme produktets organisation.
 
 Manageren må frit sammensætte et projektteam fra talentbanken og tilføje relevante roller, når opgaven fortjener det. En “ansættelse” betyder en projektrolle med en klar aflevering og en begrænset kompetencepakke — ikke automatisk installation af software, aktivering af en betalt model eller nye skrive-/deployrettigheder.
 

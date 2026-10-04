@@ -43,7 +43,7 @@ function face(agent, compact = false) {
 }
 
 function availabilityLabel(agent) {
-  return ({ active: "Arbejder", ready: "Klar", waiting: "Venter", blocked: "Blokeret" })[agent.availability] || "Klar";
+  return ({ active: "Arbejder", ready: "Klar", waiting: "Venter", blocked: "Blokeret", bench: "Talentbank" })[agent.availability] || "Klar";
 }
 
 function formatTime(iso) {
@@ -149,6 +149,9 @@ function closeDrawer() {
 function openAgent(id) {
   const agent = getAgent(id);
   if (!agent) return;
+  const competencies = Array.isArray(agent.competencies) && agent.competencies.length
+    ? `<section class="drawer-section"><p class="eyebrow">Kompetencepakke</p><div class="competency-chips">${agent.competencies.map(item => `<span>${escapeHtml(item)}</span>`).join("")}</div>${agent.handoff ? `<p class="handoff-note"><b>Afleverer til holdet:</b> ${escapeHtml(agent.handoff)}</p>` : ""}</section>`
+    : "";
   openDrawer(`
     <div class="drawer-agent-head">
       ${face(agent)}
@@ -159,8 +162,15 @@ function openAgent(id) {
       <div class="task-card"><strong>${escapeHtml(agent.task?.title || "Klar til næste opgave")}</strong><p>${escapeHtml(agent.task?.description || "")}</p><div class="task-progress"><i style="width:${Number(agent.task?.progress || 0)}%"></i></div></div>
     </section>
     <section class="drawer-section"><p class="eyebrow">Arbejdsbord</p><h3>Seneste materiale</h3><ul class="artifact-list">${agent.artifacts.map(artifact => `<li><span>${escapeHtml(artifact.name)}</span><small>${escapeHtml(artifact.state)}</small></li>`).join("")}</ul></section>
+    ${competencies}
     <section class="drawer-section"><p class="eyebrow">Besked til dig</p><div class="drawer-message"><strong>${escapeHtml(agent.name)} siger</strong>${escapeHtml(agent.message)}</div></section>
     <div class="drawer-actions">${id === "manager" ? `<button class="drawer-secondary" data-open-conversation>Se projektsamtalen</button>` : ""}<button class="drawer-action" data-compose="${escapeHtml(id)}">Skriv til manageren om ${escapeHtml(agent.name.toLowerCase())} <span>→</span></button></div>`);
+}
+
+function openTalentPool() {
+  const talentIds = ["game_designer", "graphic_designer", "copywriter", "marketer"];
+  const talents = talentIds.map(getAgent).filter(Boolean);
+  openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">✦</span><div><p class="eyebrow">Godkendte kompetencepakker</p><h2>Talentbanken</h2><p>Manageren kan sætte en specialist på et projekt, når rollen giver en bedre aflevering.</p></div></div><div class="talent-grid">${talents.map(agent => `<article class="talent-card"><div class="talent-card-head">${face(agent)}<div><span>${escapeHtml(availabilityLabel(agent))}</span><h3>${escapeHtml(agent.name)}</h3><p>${escapeHtml(agent.role)}</p></div></div><p>${escapeHtml(agent.task?.description || agent.message)}</p><div class="competency-chips">${(agent.competencies || []).map(item => `<span>${escapeHtml(item)}</span>`).join("")}</div><div class="talent-card-actions"><button data-open-agent="${escapeHtml(agent.id)}">Se profil</button><button data-compose="${escapeHtml(agent.id)}">Bed manageren vurdere</button></div></article>`).join("")}</div><div class="drawer-message"><strong>Vigtigt lige nu</strong>Disse er projektroller, ikke aktive LLM-forbindelser. En opgave kan planlægges og blive klar, men ingen ekstern model eller adgang bliver startet herfra.</div>`);
 }
 
 function stateLabel(task) {
@@ -423,6 +433,7 @@ drawer.addEventListener("click", event => {
   const conversation = event.target.closest("[data-open-conversation]");
   const presentations = event.target.closest("[data-open-presentations]");
   const newPresentation = event.target.closest("[data-new-presentation]");
+  const openAgentButton = event.target.closest("[data-open-agent]");
   if (compose) { closeDrawer(); managerInput.focus(); managerInput.placeholder = `Hvad vil du bede manageren om omkring ${getAgent(compose.dataset.compose)?.name || "denne medarbejder"}?`; }
   if (focus) activateProject(focus.dataset.focusProject);
   if (newTask) openTaskDialog(newTask.dataset.newTask);
@@ -432,6 +443,7 @@ drawer.addEventListener("click", event => {
   if (conversation) openConversation();
   if (presentations) openPresentations(presentations.dataset.openPresentations);
   if (newPresentation) openPresentationDialog(newPresentation.dataset.newPresentation);
+  if (openAgentButton) openAgent(openAgentButton.dataset.openAgent);
 });
 
 const meetingDialog = document.querySelector("#meeting-dialog");
@@ -470,6 +482,7 @@ document.querySelectorAll("[data-nav]").forEach(button => button.addEventListene
   if (button.dataset.nav === "projects") document.querySelector("#projects").scrollIntoView({ behavior: "smooth" });
   if (button.dataset.nav === "history") openActivity();
   if (button.dataset.nav === "library") openLibrary();
+  if (button.dataset.nav === "talent") openTalentPool();
 }));
 
 function openInboxDrawer() {
