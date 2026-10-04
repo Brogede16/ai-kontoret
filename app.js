@@ -202,14 +202,14 @@ function openProject(id) {
 }
 
 function referenceTypeLabel(type) {
-  return ({ brief: "Brief", note: "Note", link: "Link" })[type] || "Materiale";
+  return ({ brief: "Brief", note: "Note", link: "Link", attachment: "Billede" })[type] || "Materiale";
 }
 
 function openLibrary(projectId = selectedProjectId) {
   const project = office.projects.find(item => item.id === projectId);
   if (!project) return;
   const items = (office.libraryItems || []).filter(item => item.projectId === project.id);
-  openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">▣</span><div><p class="eyebrow">${escapeHtml(project.name)}</p><h2>Fælles bibliotek</h2><p>Den kontekst, holdet faktisk kan se i dette projekt.</p></div></div><section class="drawer-section"><p class="eyebrow">Projektmateriale</p><ul class="task-list library-list">${items.length ? items.map(item => `<li><span class="task-state ${escapeHtml(item.type)}">${escapeHtml(referenceTypeLabel(item.type))}</span><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.content)}</p><small>Gemt ${formatTime(item.createdAt)}</small></li>`).join("") : "<li><p>Ingen fælles kontekst endnu. Gem et brief, en note eller et link til manageren.</p></li>"}</ul></section><div class="drawer-actions"><button class="drawer-action" data-new-reference="${escapeHtml(project.id)}">+ Gem materiale <span>→</span></button></div>`);
+  openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">▣</span><div><p class="eyebrow">${escapeHtml(project.name)}</p><h2>Fælles bibliotek</h2><p>Projektets registrerede kontekst. Billeder ligger lokalt, men er ikke læst af manageren endnu.</p></div></div><section class="drawer-section"><p class="eyebrow">Projektmateriale</p><ul class="task-list library-list">${items.length ? items.map(item => `<li><span class="task-state ${escapeHtml(item.type)}">${escapeHtml(referenceTypeLabel(item.type))}</span><strong>${escapeHtml(item.title)}</strong>${item.type === "attachment" && item.attachmentId ? `<img class="attachment-preview" src="/api/attachments/${encodeURIComponent(item.attachmentId)}" alt="${escapeHtml(item.title)}" />` : ""}<p>${escapeHtml(item.content)}</p><small>Gemt ${formatTime(item.createdAt)}</small></li>`).join("") : "<li><p>Ingen fælles kontekst endnu. Gem et brief, en note, et link eller et referencebillede til projektet.</p></li>"}</ul></section><div class="drawer-actions"><button class="drawer-action" data-new-reference="${escapeHtml(project.id)}">+ Gem materiale <span>→</span></button></div>`);
 }
 
 function openActivity() {
@@ -333,6 +333,33 @@ async function createLibraryItem(event) {
     document.querySelector("#library-dialog").close();
     openLibrary(projectId);
     showToast("Materialet er gemt. Links bliver ikke hentet automatisk.");
+  } catch (error) { showToast(error.message); }
+}
+
+function readAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(reader.result));
+    reader.addEventListener("error", () => reject(new Error("Billedet kunne ikke læses i browseren.")));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadAttachment(file) {
+  if (!file) return;
+  if (!file.type.startsWith("image/")) return showToast("Vælg et PNG-, JPEG-, WebP- eller GIF-billede.");
+  if (file.size > 2 * 1024 * 1024) return showToast("Billedet skal være under 2 MB.");
+  const project = currentProject();
+  if (!project) return showToast("Vælg et projekt først.");
+  try {
+    showToast("Gemmer referencebilledet lokalt…");
+    const dataUrl = await readAsDataUrl(file);
+    const result = await api("/api/attachments", { method: "POST", body: JSON.stringify({ projectId: project.id, name: file.name, dataUrl }) });
+    office = result.office;
+    selectedProjectId = project.id;
+    render();
+    openLibrary(project.id);
+    showToast("Referencebilledet er gemt. Ingen model har set det endnu.");
   } catch (error) { showToast(error.message); }
 }
 
@@ -466,7 +493,13 @@ document.querySelector("#focus-button").addEventListener("click", event => {
   event.currentTarget.textContent = enabled ? "✓ Fokus i gang" : "✦ Fokus-tilstand";
   showToast(enabled ? "Manageren holder afbrydelser på et minimum den næste time." : "Fokus-tilstand er slået fra.");
 });
-document.querySelector("#attach-button").addEventListener("click", () => showToast("Filer kommer i næste slice. Manageren må ikke foregive, at den har set en vedhæftning endnu."));
+const attachmentInput = document.querySelector("#attachment-input");
+document.querySelector("#attach-button").addEventListener("click", () => attachmentInput.click());
+attachmentInput.addEventListener("change", event => {
+  const [file] = event.target.files;
+  uploadAttachment(file);
+  event.target.value = "";
+});
 document.querySelector("#view-activity").addEventListener("click", openActivity);
 document.querySelector("#open-inbox").addEventListener("click", () => {
   if (window.matchMedia("(max-width: 1080px)").matches) return openInboxDrawer();

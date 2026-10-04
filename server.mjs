@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
@@ -7,14 +7,17 @@ import { randomUUID } from "node:crypto";
 import { addActivity, addConversation, createOfficeStore, projectSummary } from "./store.mjs";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
+const uploadsDirectory = join(root, "data", "uploads");
 const host = "127.0.0.1";
 const port = Number(process.env.PORT || 4173);
 const store = createOfficeStore(process.env.OFFICE_STATE_PATH || join(root, "data", "office-state.json"));
 const maxMessageLength = 2_500;
 const maxRunMs = 120_000;
+const maxAttachmentBytes = 2 * 1024 * 1024;
 const eventClients = new Set();
 let activeRun = false;
 const assignableRoles = new Set(["designer", "researcher", "developer", "reviewer", "game_designer", "graphic_designer", "copywriter", "marketer"]);
+const imageExtensions = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
 
 const types = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8",
@@ -28,12 +31,12 @@ function json(response, status, body) {
 
 function notFound(response) { return json(response, 404, { error: "Vi kunne ikke finde det, du bad om." }); }
 
-function readBody(request) {
+function readBody(request, maxBytes = 32_000) {
   return new Promise((resolve, reject) => {
     let data = "";
     request.on("data", chunk => {
       data += chunk;
-      if (data.length > 32_000) reject(new Error("Beskeden er for stor."));
+      if (data.length > maxBytes) reject(new Error("Beskeden er for stor."));
     });
     request.on("end", () => resolve(data));
     request.on("error", reject);
@@ -47,6 +50,15 @@ function parseBody(raw) {
 
 function makeId(prefix) { return `${prefix}-${randomUUID().slice(0, 8)}`; }
 function roleName(role) { return ({ manager: "Manageren", designer: "Designeren", researcher: "Researcheren", developer: "Udvikleren", reviewer: "Revieweren", game_designer: "Spildesigneren", graphic_designer: "Grafikeren", copywriter: "Tekstforfatteren", marketer: "Marketingpersonen" })[role] || role; }
+
+function decodeImageData(dataUrl) {
+  if (typeof dataUrl !== "string") throw new Error("Vælg et billede først.");
+  const match = /^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=\s]+)$/.exec(dataUrl);
+  if (!match || !imageExtensions[match[1]]) throw new Error("Vælg et PNG-, JPEG-, WebP- eller GIF-billede.");
+  const buffer = Buffer.from(match[2], "base64");
+  if (!buffer.length || buffer.length > maxAttachmentBytes) throw new Error("Billedet skal være under 2 MB.");
+  return { buffer, mimeType: match[1], extension: imageExtensions[match[1]] };
+}
 
 function decisionView(decision) {
   const level = decision.level === "executive" ? "executive" : "team";
@@ -85,7 +97,7 @@ function managerPrompt(message, project, projectTasks, projectReferences, conver
     ? `Eksisterende arbejdskø (den er kun planlagt eller klar; intet er startet automatisk):\n${projectTasks.map(task => `- [${task.state}] ${roleName(task.role)}: ${task.title}${task.acceptance ? ` (accept: ${task.acceptance})` : ""}`).join("\n")}`
     : "Arbejdskø: ingen konkrete opgaver endnu.";
   const referenceContext = projectReferences.length
-    ? `Fælles bibliotek (Mads har gemt disse noter eller links; links er ikke hentet eller læst):\n${projectReferences.map(item => `- [${item.type}] ${item.title}: ${item.content}`).join("\n")}`
+    ? `Fælles bibliotek (Mads har gemt disse noter eller links; links er ikke hentet eller læst, og gemte billeder er ikke set):\n${projectReferences.map(item => `- [${item.type}] ${item.title}: ${item.type === "attachment" ? "Et lokalt billede er gemt, men er ikke læst af manageren." : item.content}`).join("\n")}`
     : "Fælles bibliotek: intet projektmateriale er gemt endnu.";
   const conversationContext = conversationHistory.length
     ? `Seneste læsbare projekthistorik (ikke skjult ræsonnement):\n${[...conversationHistory].reverse().map(item => `- ${item.role === "mads" ? "Mads" : "Manageren"}: ${item.text}`).join("\n")}`
@@ -230,6 +242,16 @@ const server = createServer(async (request, response) => {
   if (request.method === "GET" && url.pathname === "/api/events") return openEventStream(request, response);
   if (request.method === "GET" && url.pathname === "/api/health") return json(response, 200, { ok: true, busy: activeRun, worker: "Codex · read-only", localOnly: true });
   if (request.method === "GET" && url.pathname === "/api/bootstrap") return json(response, 200, { ok: true, office: officeView(await store.snapshot()) });
+  if (request.method === "GET" && segments[0] === "api" && segments[1] === "attachments" && segments[2]) {
+    const state = await store.snapshot();
+    const attachment = (state.attachments || []).find(item => item.id === segments[2]);
+    if (!attachment || !imageExtensions[attachment.mimeType] || !/^[a-z0-9-]+\.(png|jpg|webp|gif)$/.test(attachment.storageName || "")) return notFound(response);
+    try {
+      const content = await readFile(join(uploadsDirectory, attachment.storageName));
+      response.writeHead(200, { "Content-Type": attachment.mimeType, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+      return response.end(content);
+    } catch { return notFound(response); }
+  }
 
   if (request.method === "POST" && url.pathname === "/api/projects") {
     try { const result = await createProject(parseBody(await readBody(request))); return json(response, 201, { ok: true, project: result.result, office: officeView(result.state) }); }
@@ -286,6 +308,32 @@ const server = createServer(async (request, response) => {
       });
       return json(response, 201, { ok: true, item: outcome.result, office: officeView(outcome.state) });
     } catch (error) { return json(response, 400, { error: error.message || "Materialet kunne ikke gemmes." }); }
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/attachments") {
+    try {
+      const body = parseBody(await readBody(request, maxAttachmentBytes * 2));
+      const projectId = typeof body.projectId === "string" ? body.projectId : "";
+      const before = await store.snapshot();
+      if (!before.projects.some(project => project.id === projectId)) throw new Error("Vælg et projekt, før du gemmer et billede.");
+      const { buffer, mimeType, extension } = decodeImageData(body.dataUrl);
+      const originalName = typeof body.name === "string" && body.name.trim() ? body.name.trim().slice(0, 120) : `Reference.${extension}`;
+      const attachment = { id: makeId("attachment"), projectId, name: originalName, mimeType, size: buffer.length, storageName: "", createdAt: new Date().toISOString() };
+      attachment.storageName = `${attachment.id}.${extension}`;
+      await mkdir(uploadsDirectory, { recursive: true });
+      await writeFile(join(uploadsDirectory, attachment.storageName), buffer);
+      const outcome = await mutate(state => {
+        const project = state.projects.find(item => item.id === projectId);
+        if (!project) throw new Error("Projektet findes ikke længere.");
+        state.attachments.unshift(attachment);
+        const item = { id: makeId("reference"), projectId: project.id, type: "attachment", title: originalName, content: "Lokalt referencebillede. Det er gemt i projektet, men ikke læst af manageren eller sendt til en model.", attachmentId: attachment.id, createdAt: attachment.createdAt, updatedAt: attachment.createdAt };
+        state.libraryItems.unshift(item);
+        project.updatedAt = attachment.createdAt;
+        addActivity(state, "manager", `Mads gemte referencebilledet “${originalName}” i det fælles bibliotek.`, project.id, "attachment");
+        return { attachment, item };
+      });
+      return json(response, 201, { ok: true, ...outcome.result, office: officeView(outcome.state) });
+    } catch (error) { return json(response, 400, { error: error.message || "Billedet kunne ikke gemmes." }); }
   }
 
   if (request.method === "POST" && url.pathname === "/api/presentations") {

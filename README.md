@@ -26,6 +26,7 @@ Serveren giver UI'et en lokal, skrivebeskyttet Codex-manager. Den kræver, at Co
 - Et chef-lag med direktionsbeslutninger først og mindre team-afgørelser nedenunder, begge med anbefaling, trade-off og timing.
 - Designgennemgange med to retninger, kriterier og anbefaling. De viser kun det grundlag, der faktisk er leveret.
 - Vedvarende projekter, opgaver, leverancer, acceptkriterier og et fælles bibliotek med noter, briefs og links — gemt lokalt i `data/office-state.json`, som aldrig commit'es.
+- Lokale referencebilleder (PNG, JPEG, WebP eller GIF op til 2 MB) kan vedhæftes til et projekt og vises i biblioteket. De gemmes under `data/uploads/`, bliver ikke commit'et og er ikke læst af manageren eller sendt til en model.
 - En opgave kan klargøres til en worker, men det starter ikke en model og giver ikke rettigheder.
 - Live-synkronisering på tværs af åbne lokale faner, møde-markeringer, fokus-tilstand, medarbejderpaneler og responsiv mobilnavigation.
 

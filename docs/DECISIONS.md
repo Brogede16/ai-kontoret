@@ -86,6 +86,14 @@ Denne fil er den korte, menneskelæselige beslutningslog for produktets retning.
 
 **Hvorfor:** En medarbejderrolle må ikke ligne en aktiv model, før login, rettigheder, kvote og output-kontrakt er afklaret. Det forebygger både falsk status og for brede tilladelser.
 
+## 014 · Referencebilleder er lokale artefakter, ikke automatisk modelinput
+
+**Beslutning:** Mads kan gemme små referencebilleder i et projekts fælles bibliotek og se dem i kontoret. De lagres kun lokalt, commit'es ikke og kommer ikke automatisk med i managerens eller en workers kontekst.
+
+**Hvorfor:** Visuel feedback er vigtig for designarbejdet, men en upload må ikke i stilhed blive til filadgang for en model eller en cloud-tjeneste.
+
+**Grænse:** Først en særskilt, begrænset worker-forbindelse må læse et bestemt billede. Indtil da er billedet kun synligt for Mads i det lokale kontrolrum.
+
 ## Åbne beslutninger
 
 - Hvilken worker skal først få eksplicit, begrænset adgang: GitHub, en lokal projektmappe eller research?

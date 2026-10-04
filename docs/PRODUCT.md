@@ -8,7 +8,7 @@ Det skal føles som et kreativt studio med medarbejdere — ikke som et fleragen
 
 ## Kerneoplevelse
 
-1. Mads skriver eller indtaler en idé til manageren og kan vedhæfte referencebilleder/filer.
+1. Mads skriver eller indtaler en idé til manageren og kan gemme referencebilleder i projektbiblioteket.
 2. Manageren samler en afgrænset opgavepakke og tildeler relevante roller.
 3. Medarbejdere leverer konkrete artefakter: research-noter, UI-forslag, preview, kodebranch, tests eller review.
 4. Manageren filtrerer og samler modstridende forslag, før Mads bliver forstyrret.
@@ -51,6 +51,10 @@ Manager, designer, researcher, udvikler, reviewer, spildesigner, grafiker, tekst
 Manageren må frit sammensætte et projektteam fra talentbanken og tilføje relevante roller, når opgaven fortjener det. En “ansættelse” betyder en projektrolle med en klar aflevering og en begrænset kompetencepakke — ikke automatisk installation af software, aktivering af en betalt model eller nye skrive-/deployrettigheder.
 
 Kontoret viser separat, hvilke lokale worker-forbindelser der faktisk er konfigureret. Det gør det tydeligt, når en rolle er klar i organisationen, men endnu ikke kan udføre arbejde gennem Claude Code, Gemini CLI eller en anden underliggende worker.
+
+## Lokale referencebilleder
+
+Mads kan gemme et lille referencebillede i det aktive projekts bibliotek. Det er et lokalt, synligt artefakt for Mads — ikke implicit modelkontekst. Manageren ser kun registreringen og må ikke påstå at have set billedet. En senere worker, der skal læse billedet, kræver en eksplicit filadgangs- og output-kontrakt.
 
 ## Mads-profilen
 

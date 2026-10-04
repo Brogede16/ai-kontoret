@@ -60,6 +60,15 @@ test("projekt, bibliotek og opgave flyder gennem den lokale API uden worker-adga
     assert.equal(reference.status, 201);
     assert.equal(reference.body.item.type, "brief");
 
+    const attachment = await request(port, "/api/attachments", "POST", {
+      projectId, name: "reference.png", dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLdnQAAAABJRU5ErkJggg=="
+    });
+    assert.equal(attachment.status, 201);
+    assert.equal(attachment.body.attachment.mimeType, "image/png");
+    const imageResponse = await fetch(`http://127.0.0.1:${port}/api/attachments/${attachment.body.attachment.id}`);
+    assert.equal(imageResponse.status, 200);
+    assert.equal(imageResponse.headers.get("content-type"), "image/png");
+
     const presentation = await request(port, "/api/presentations", "POST", {
       projectId, level: "executive", title: "Vælg mobilretning", directionA: "Rolig og tekstbåret.", directionB: "Visuel og hurtig.", criteria: "Mobilforståelse og tempo.", recommendation: "Vælg B til første test."
     });
@@ -85,6 +94,7 @@ test("projekt, bibliotek og opgave flyder gennem den lokale API uden worker-adga
     const office = await request(port, "/api/bootstrap");
     assert.equal(office.body.office.projects[0].id, projectId);
     assert.equal(office.body.office.libraryItems.some(item => item.id === reference.body.item.id), true);
+    assert.equal(office.body.office.libraryItems.some(item => item.attachmentId === attachment.body.attachment.id), true);
     assert.equal(office.body.office.presentations.some(item => item.id === presentation.body.presentation.id), true);
     assert.equal(office.body.office.decisions.some(item => item.id === presentation.body.decision.id), false);
     assert.equal(office.body.office.conversations.some(item => item.relatedId === presentation.body.decision.id && item.role === "mads"), true);

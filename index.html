@@ -62,6 +62,7 @@
             <button type="button" class="attach-button" id="attach-button" aria-label="Vedhæft et billede eller en fil">＋</button>
             <button type="submit" class="send-button" aria-label="Send besked">↑</button>
           </form>
+          <input id="attachment-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
           <button class="chat-history-button" id="chat-history" aria-label="Åbn projektsamtalen">☷<span>Samtale</span></button>
           <button class="voice-button" aria-label="Indtal besked">◉</button>
         </section>
@@ -206,7 +207,7 @@
       <button class="dialog-close" id="library-dialog-close" aria-label="Luk fælles bibliotek">×</button>
       <p class="eyebrow">Fælles bibliotek</p>
       <h2>Giv holdet fælles kontekst</h2>
-      <p>Gem en note, et brief eller et link, som manageren kan se i projektet. Links bliver ikke hentet eller læst automatisk; fil-upload kommer i et senere, sikkert lag.</p>
+      <p>Gem en note, et brief eller et link, som manageren kan se i projektet. Links bliver ikke hentet automatisk. Referencebilleder gemmes via plusset i chatfeltet og bliver ikke læst af manageren endnu.</p>
       <form id="library-form" class="project-form">
         <input type="hidden" name="projectId" />
         <label>Type<select name="type"><option value="brief">Projektbrief</option><option value="note">Note</option><option value="link">Link</option></select></label>

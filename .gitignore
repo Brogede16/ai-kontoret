@@ -3,3 +3,4 @@ node_modules/
 dist/
 data/office-state.json
 data/office-state.json.tmp
+data/uploads/

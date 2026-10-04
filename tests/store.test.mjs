@@ -17,6 +17,7 @@ test("kontorets lokale tilstand overlever en genstart", async () => {
     assert.equal(seeded.agents.game_designer.competencies.includes("Core loop"), true);
     assert.equal(seeded.connectors.codex.state, "configured");
     assert.equal(seeded.connectors.claude_code.state, "unconfigured");
+    assert.deepEqual(seeded.attachments, []);
 
     await store.mutate(state => {
       state.projects.unshift({

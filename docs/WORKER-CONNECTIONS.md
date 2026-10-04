@@ -34,6 +34,12 @@ Claude Code og Gemini CLI har begge dokumenterede non-interaktive/strukturerede 
 
 Ingen worker springer niveauer over. Deploy, merge, publicering og køb er fortsat hårde stop, også på niveau 3.
 
+## Lokale referencebilleder
+
+Kontoret kan gemme PNG, JPEG, WebP eller GIF op til 2 MB som lokale projektartefakter. De ligger uden for Git i `data/uploads/` og vises kun i biblioteket. Managerens kontekst får kun at vide, at et billede er registreret; billedebytes eller synsfortolkning sendes ikke til den.
+
+At lade en worker se ét billede er en niveau-1-tilladelse: den skal være knyttet til en bestemt opgave, en bestemt forbindelse og en tydelig aflevering. Det bliver ikke slået til af en upload alene.
+
 ## Hvorfor forbindelser vises i produktet
 
 Kontorets “Forbindelser”-oversigt må kun vise faktisk konfigurerede lokale forbindelser, deres scope og deres begrænsninger. Den må aldrig gøre et grønt ikon til en påstand om, at en model kan læse filer, bruge en konto eller arbejde i baggrunden, før den capability er testet og godkendt.

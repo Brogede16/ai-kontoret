@@ -15,7 +15,7 @@ function activity(actorId, text, projectId = null, kind = "status") {
 
 export function createSeedState() {
   return {
-    version: 4,
+    version: 5,
     updatedAt: now(),
     activeProjectId: "ai-office",
     agents: {
@@ -132,6 +132,7 @@ export function createSeedState() {
       }
     ],
     presentations: [],
+    attachments: [],
     libraryItems: [
       {
         id: "reference-office-direction", projectId: "ai-office", type: "brief", title: "Produktretning for AI-kontoret",
@@ -200,7 +201,8 @@ export function createOfficeStore(filePath) {
       if (!Array.isArray(state.libraryItems)) state.libraryItems = [];
       if (!Array.isArray(state.conversations)) state.conversations = [];
       if (!Array.isArray(state.presentations)) state.presentations = [];
-      state.version = Math.max(Number(state.version) || 1, 4);
+      if (!Array.isArray(state.attachments)) state.attachments = [];
+      state.version = Math.max(Number(state.version) || 1, 5);
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
       state = createSeedState();
