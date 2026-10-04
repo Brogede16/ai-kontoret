@@ -290,3 +290,20 @@ test("Mads kan tilføje, redigere og fjerne præferencer", () => withServer(asyn
   assert.equal(removed.body.office.preferences.some(item => item.id === id), false);
   assert.equal((await request(port, `/api/preferences/${id}`, "DELETE")).status, 400);
 }));
+
+test("et projekt kan omdøbes og sættes på pause, og materiale kan fjernes", () => withServer(async port => {
+  const patched = await request(port, "/api/projects/idea-bank", "PATCH", { name: "Idébank 2", description: "Ny tekst.", state: "Pause" });
+  assert.equal(patched.status, 200);
+  assert.equal(patched.body.project.state, "Pause");
+  assert.equal((await request(port, "/api/projects/idea-bank", "PATCH", { name: "" })).status, 400);
+  const invalid = await request(port, "/api/projects/idea-bank", "PATCH", { name: "Idébank 2", state: "Slettet" });
+  assert.equal(invalid.body.project.state, "Pause");
+
+  const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLdnQAAAABJRU5ErkJggg==";
+  const uploaded = await request(port, "/api/attachments", "POST", { projectId: "ai-office", name: "ref.png", dataUrl: png });
+  assert.equal(uploaded.status, 201);
+  const removed = await request(port, `/api/library/${uploaded.body.item.id}`, "DELETE");
+  assert.equal(removed.status, 200);
+  assert.equal(removed.body.office.attachments.some(item => item.id === uploaded.body.attachment.id), false);
+  assert.equal((await fetch(`http://127.0.0.1:${port}/api/attachments/${uploaded.body.attachment.id}`)).status, 404);
+}));

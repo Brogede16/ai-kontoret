@@ -65,3 +65,6 @@ body.evening .plant { color:#3f7350; }
 .task-list li.is-done strong { color:#53685f; }
 .preserve-lines { white-space:pre-line; }
 .field-hint { display:block; font-weight:500; color:var(--muted); font-size:10px; margin-top:2px; }
+.project-card.is-resting { opacity:.62; }
+.project-card.is-resting:hover { opacity:1; }
+.inline-link { padding:0; font-size:inherit; letter-spacing:inherit; text-transform:none; }

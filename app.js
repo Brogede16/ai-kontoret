@@ -151,8 +151,10 @@ function renderCrew() {
 
 function renderProjects() {
   const grid = document.querySelector("#project-grid");
-  grid.innerHTML = office.projects.map(project => `
-    <button class="project-card ${project.id === selectedProjectId ? "active" : ""}" data-project="${escapeHtml(project.id)}">
+  const resting = project => (project.state === "Afsluttet" ? 2 : project.state === "Pause" ? 1 : 0);
+  const projects = office.projects.slice().sort((a, b) => resting(a) - resting(b));
+  grid.innerHTML = projects.map(project => `
+    <button class="project-card ${project.id === selectedProjectId ? "active" : ""} ${resting(project) ? "is-resting" : ""}" data-project="${escapeHtml(project.id)}">
       <div class="project-top"><span class="project-dot" style="background:${escapeHtml(project.color)}"></span><span class="project-state">${escapeHtml(project.state)}</span></div>
       <h3>${escapeHtml(project.name)}</h3><p>${escapeHtml(project.description)}</p>
       <div class="project-meta"><span class="project-avatars">${project.people.map(id => face(getAgent(id), true)).join("")}</span><span>${project.taskCount ? `${project.progress}% fremdrift` : "Klar til brief"}</span></div>
@@ -263,7 +265,7 @@ function openProject(id) {
   const references = (office.libraryItems || []).filter(item => item.projectId === id);
   const presentations = (office.presentations || []).filter(item => item.projectId === id);
   openDrawer(`
-    <div class="project-drawer-head"><span class="project-dot" style="background:${escapeHtml(project.color)}"></span><p class="eyebrow">${escapeHtml(project.state)}</p><h2>${escapeHtml(project.name)}</h2><p>${escapeHtml(project.description)}</p></div>
+    <div class="project-drawer-head"><span class="project-dot" style="background:${escapeHtml(project.color)}"></span><p class="eyebrow">${escapeHtml(project.state)} · <button class="task-link inline-link" data-edit-project="${escapeHtml(project.id)}">Redigér</button></p><h2>${escapeHtml(project.name)}</h2><p>${escapeHtml(project.description)}</p></div>
     <section class="drawer-section"><p class="eyebrow">Fremdrift</p><div class="task-card"><strong>${project.progress}% samlet</strong><p>${project.activeCount} arbejder nu · ${project.readyCount} opgaver er klar · ${project.taskCount} i alt</p><div class="task-progress"><i style="width:${project.progress}%"></i></div></div></section>
     <section class="drawer-section"><p class="eyebrow">Fælles kontekst</p><div class="library-summary"><strong>${references.length} ${references.length === 1 ? "materiale" : "materialer"}</strong><p>Noter, briefs og links, der følger projektet.</p><button class="task-ready" data-open-library="${escapeHtml(project.id)}">Åbn bibliotek</button></div></section>
     <section class="drawer-section"><p class="eyebrow">Designvalg</p><div class="library-summary"><strong>${presentations.length} ${presentations.length === 1 ? "gennemgang" : "gennemgange"}</strong><p>Konkrete sammenligninger til Mads — aldrig opdigtede previews.</p><button class="task-ready" data-open-presentations="${escapeHtml(project.id)}">Se designgennemgange</button></div></section>
@@ -307,7 +309,7 @@ function openLibrary(projectId = selectedProjectId) {
   const project = office.projects.find(item => item.id === projectId);
   if (!project) return;
   const items = (office.libraryItems || []).filter(item => item.projectId === project.id);
-  openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">▣</span><div><p class="eyebrow">${escapeHtml(project.name)}</p><h2>Fælles bibliotek</h2><p>Projektets registrerede kontekst. Billeder ligger lokalt, men er ikke læst af manageren endnu.</p></div></div><section class="drawer-section"><p class="eyebrow">Projektmateriale</p><ul class="task-list library-list">${items.length ? items.map(item => `<li><span class="task-state ${escapeHtml(item.type)}">${escapeHtml(referenceTypeLabel(item.type))}</span><strong>${escapeHtml(item.title)}</strong>${item.type === "attachment" && item.attachmentId ? `<img class="attachment-preview" src="/api/attachments/${encodeURIComponent(item.attachmentId)}" alt="${escapeHtml(item.title)}" />` : ""}<p class="preserve-lines">${escapeHtml(item.content)}</p>${item.url ? `<a class="task-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Åbn link ↗</a>` : ""}<small>Gemt ${formatTime(item.createdAt)}</small></li>`).join("") : "<li><p>Ingen fælles kontekst endnu. Gem et brief, en note, et link eller et referencebillede til projektet.</p></li>"}</ul></section><div class="drawer-actions"><button class="drawer-action" data-new-reference="${escapeHtml(project.id)}">+ Gem materiale <span>→</span></button></div>`);
+  openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">▣</span><div><p class="eyebrow">${escapeHtml(project.name)}</p><h2>Fælles bibliotek</h2><p>Projektets registrerede kontekst. Billeder ligger lokalt, men er ikke læst af manageren endnu.</p></div></div><section class="drawer-section"><p class="eyebrow">Projektmateriale</p><ul class="task-list library-list">${items.length ? items.map(item => `<li><span class="task-state ${escapeHtml(item.type)}">${escapeHtml(referenceTypeLabel(item.type))}</span><strong>${escapeHtml(item.title)}</strong>${item.type === "attachment" && item.attachmentId ? `<img class="attachment-preview" src="/api/attachments/${encodeURIComponent(item.attachmentId)}" alt="${escapeHtml(item.title)}" />` : ""}<p class="preserve-lines">${escapeHtml(item.content)}</p><div class="task-actions">${item.url ? `<a class="task-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Åbn link ↗</a>` : ""}<button class="task-link" data-delete-reference="${escapeHtml(item.id)}">Fjern</button></div><small>Gemt ${formatTime(item.createdAt)}</small></li>`).join("") : "<li><p>Ingen fælles kontekst endnu. Gem et brief, en note, et link eller et referencebillede til projektet.</p></li>"}</ul></section><div class="drawer-actions"><button class="drawer-action" data-new-reference="${escapeHtml(project.id)}">+ Gem materiale <span>→</span></button></div>`);
 }
 
 function openActivity() {
@@ -360,6 +362,43 @@ async function savePreference(event) {
     document.querySelector("#preference-dialog").close();
     openProfile();
     showToast("Præferencen er gemt. Manageren får den med i næste oplæg.");
+  } catch (error) { showToast(error.message); }
+}
+
+function openProjectEditDialog(id) {
+  const project = office.projects.find(item => item.id === id);
+  if (!project) return;
+  const form = document.querySelector("#project-edit-form");
+  form.elements.id.value = project.id;
+  form.elements.name.value = project.name;
+  form.elements.description.value = project.description;
+  form.elements.state.value = project.state;
+  document.querySelector("#project-edit-dialog").showModal();
+}
+
+async function saveProject(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const { id, ...payload } = Object.fromEntries(new FormData(form));
+  try {
+    const result = await api(`/api/projects/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(payload) });
+    office = result.office;
+    render();
+    document.querySelector("#project-edit-dialog").close();
+    openProject(id);
+    showToast("Projektet er opdateret.");
+  } catch (error) { showToast(error.message); }
+}
+
+async function deleteReference(id) {
+  const item = office.libraryItems.find(entry => entry.id === id);
+  if (!item || !confirm(`Fjern “${item.title}” fra biblioteket?${item.type === "attachment" ? " Billedfilen slettes også." : ""}`)) return;
+  try {
+    const result = await api(`/api/library/${encodeURIComponent(id)}`, { method: "DELETE" });
+    office = result.office;
+    render();
+    openLibrary(item.projectId);
+    showToast("Materialet er fjernet.");
   } catch (error) { showToast(error.message); }
 }
 
@@ -692,6 +731,10 @@ drawer.addEventListener("click", event => {
     managerInput.placeholder = compose.dataset.compose === "manager" ? defaultPlaceholder : `Hvad vil du bede manageren om omkring ${getAgent(compose.dataset.compose)?.name.toLowerCase() || "denne medarbejder"}?`;
   }
   if (openProjectButton) openProject(openProjectButton.dataset.openProject);
+  const editProject = event.target.closest("[data-edit-project]");
+  const removeReference = event.target.closest("[data-delete-reference]");
+  if (editProject) openProjectEditDialog(editProject.dataset.editProject);
+  if (removeReference) deleteReference(removeReference.dataset.deleteReference);
   const editPreference = event.target.closest("[data-edit-preference]");
   const removePreference = event.target.closest("[data-delete-preference]");
   if (event.target.closest("[data-new-preference]")) openPreferenceDialog();
@@ -749,6 +792,7 @@ document.querySelector("#library-form").addEventListener("submit", createLibrary
 document.querySelector("#presentation-dialog-close").addEventListener("click", () => document.querySelector("#presentation-dialog").close());
 document.querySelector("#presentation-form").addEventListener("submit", createPresentation);
 document.querySelector("#preference-form").addEventListener("submit", savePreference);
+document.querySelector("#project-edit-form").addEventListener("submit", saveProject);
 document.querySelector("#start-form").addEventListener("submit", event => submitTaskForm(event, "start", "Opgaven står som i gang."));
 document.querySelector("#deliver-form").addEventListener("submit", event => submitTaskForm(event, "deliver", "Afleveringen er gemt i biblioteket."));
 document.querySelectorAll("[data-close-dialog]").forEach(button => button.addEventListener("click", () => button.closest("dialog").close()));

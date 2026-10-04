@@ -1,16 +1,19 @@
 import { createServer } from "node:http";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { addActivity, addConversation, createOfficeStore, projectSummary } from "./store.mjs";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
-const uploadsDirectory = join(root, "data", "uploads");
+
 const host = "127.0.0.1";
 const port = Number(process.env.PORT || 4173);
-const store = createOfficeStore(process.env.OFFICE_STATE_PATH || join(root, "data", "office-state.json"));
+const statePath = process.env.OFFICE_STATE_PATH || join(root, "data", "office-state.json");
+const store = createOfficeStore(statePath);
+// Billeder ligger ved siden af tilstandsfilen, så tests og andre tilstande aldrig skriver i Mads' rigtige data.
+const uploadsDirectory = join(dirname(statePath), "uploads");
 const maxMessageLength = 2_500;
 const maxRunMs = 120_000;
 const maxAttachmentBytes = 2 * 1024 * 1024;
@@ -19,6 +22,7 @@ const eventClients = new Set();
 let activeRun = false;
 let codexAvailable = null;
 const assignableRoles = new Set(["designer", "researcher", "developer", "reviewer", "game_designer", "graphic_designer", "copywriter", "marketer"]);
+const projectStates = ["Udforsker", "Bygger", "Pause", "Afsluttet"];
 const imageExtensions = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
 
 // Kun browserens egne filer serveres. Kildekode, .git, data og docs bliver aldrig udleveret over HTTP.
@@ -631,6 +635,47 @@ const server = createServer(async (request, response) => {
       });
       return json(response, request.method === "POST" ? 201 : 200, { ok: true, ...outcome.result, office: officeView(outcome.state) });
     } catch (error) { return json(response, 400, { error: error.message || "Præferencen kunne ikke gemmes." }); }
+  }
+
+  if (request.method === "PATCH" && segments[0] === "api" && segments[1] === "projects" && segments[2] && !segments[3]) {
+    try {
+      const body = parseBody(await readBody(request));
+      const outcome = await mutate(state => {
+        const project = state.projects.find(item => item.id === segments[2]);
+        if (!project) throw new Error("Projektet findes ikke længere.");
+        const name = cleanText(body.name, 80);
+        if (!name) throw new Error("Et projekt skal have et navn.");
+        const description = cleanText(body.description, 420);
+        const nextState = projectStates.includes(body.state) ? body.state : project.state;
+        const changes = [name !== project.name && "navn", description !== project.description && "beskrivelse", nextState !== project.state && `status → ${nextState}`].filter(Boolean);
+        Object.assign(project, { name, description: description || project.description, state: nextState, updatedAt: new Date().toISOString() });
+        if (changes.length) addActivity(state, "manager", `Mads opdaterede “${project.name}”: ${changes.join(", ")}.`, project.id, "project");
+        return { project };
+      });
+      return json(response, 200, { ok: true, ...outcome.result, office: officeView(outcome.state) });
+    } catch (error) { return json(response, 400, { error: error.message || "Projektet kunne ikke opdateres." }); }
+  }
+
+  if (request.method === "DELETE" && segments[0] === "api" && segments[1] === "library" && segments[2]) {
+    try {
+      let storageName = null;
+      const outcome = await mutate(state => {
+        const item = state.libraryItems.find(entry => entry.id === segments[2]);
+        if (!item) throw new Error("Materialet findes ikke længere.");
+        state.libraryItems = state.libraryItems.filter(entry => entry.id !== item.id);
+        if (item.attachmentId) {
+          const attachment = state.attachments.find(entry => entry.id === item.attachmentId);
+          storageName = attachment?.storageName || null;
+          state.attachments = state.attachments.filter(entry => entry.id !== item.attachmentId);
+        }
+        for (const task of state.tasks) if (task.artifactId === item.id) task.artifactId = null;
+        addActivity(state, "manager", `Mads fjernede “${item.title}” fra biblioteket.`, item.projectId, "library");
+        return { item };
+      });
+      // Billedfilen slettes først, når registreringen er væk, så biblioteket aldrig peger på en manglende fil.
+      if (storageName && /^[a-z0-9-]+\.(png|jpg|webp|gif)$/.test(storageName)) await unlink(join(uploadsDirectory, storageName)).catch(() => undefined);
+      return json(response, 200, { ok: true, ...outcome.result, office: officeView(outcome.state) });
+    } catch (error) { return json(response, 400, { error: error.message || "Materialet kunne ikke fjernes." }); }
   }
 
   if (request.method === "GET") return serveStatic(url.pathname, response);

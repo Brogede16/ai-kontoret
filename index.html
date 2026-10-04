@@ -189,6 +189,19 @@
       </form>
     </dialog>
 
+    <dialog id="project-edit-dialog">
+      <button class="dialog-close" data-close-dialog aria-label="Luk">×</button>
+      <p class="eyebrow">Projekt</p>
+      <h2>Redigér projektet</h2>
+      <form id="project-edit-form" class="project-form">
+        <input type="hidden" name="id" />
+        <label>Navn<input name="name" required maxlength="80" /></label>
+        <label>Kort beskrivelse<textarea name="description" maxlength="420"></textarea></label>
+        <label>Status<select name="state"><option>Udforsker</option><option>Bygger</option><option>Pause</option><option>Afsluttet</option></select></label>
+        <button class="primary-action" type="submit">Gem projekt <span>→</span></button>
+      </form>
+    </dialog>
+
     <dialog id="task-dialog">
       <button class="dialog-close" id="task-dialog-close" aria-label="Luk opret opgave">×</button>
       <p class="eyebrow">Klargør opgave</p>
