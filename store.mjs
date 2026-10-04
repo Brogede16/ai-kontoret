@@ -39,9 +39,9 @@ export function createSeedState() {
       },
       developer: {
         id: "developer", initial: "U", face: "developer-face", name: "Udvikleren", role: "Bygger & integrerer",
-        availability: "active", status: "Bygger projektkommandocenter", task: { title: "Gør projekter og opgaver vedvarende", description: "Den aktuelle vertikale slice i AI-kontoret: lokal database, API'er og levende projektstatus.", progress: 62 },
-        artifacts: [{ name: "Feature-branch", state: "aktiv" }, { name: "Server-API", state: "under bygning" }],
-        message: "Jeg arbejder i en separat branch. Det bliver først klar til review, når backend og UI hænger sammen."
+        availability: "ready", status: "Har afleveret projektkommandocenteret", task: { title: "Klar til review", description: "Projekt-, opgave- og biblioteksflowet er samlet lokalt med tests. Næste skridt er et konkret review eller en ny godkendt worker-forbindelse.", progress: 100 },
+        artifacts: [{ name: "Feature-branch", state: "klar til review" }, { name: "Lokal API-test", state: "grøn" }],
+        message: "Projektkommandocenteret er afleveret i en feature-branch. Jeg starter ikke en ny opgave, før manageren eller Mads har givet et tydeligt spor."
       },
       reviewer: {
         id: "reviewer", initial: "Q", face: "reviewer-face", name: "Revieweren", role: "Kvalitet & modspil",
@@ -64,7 +64,7 @@ export function createSeedState() {
     ],
     tasks: [
       {
-        id: "task-command-center", projectId: "ai-office", role: "developer", state: "active", progress: 62,
+        id: "task-command-center", projectId: "ai-office", role: "developer", state: "done", progress: 100,
         title: "Gør projekter og opgaver vedvarende", description: "Gem projektstatus, opgaver, beslutninger og aktivitet lokalt og vis dem levende i kontoret.",
         acceptance: "Data overlever genstart; UI synkroniserer med API'et; ingen nye eksterne rettigheder.", createdAt: now(), updatedAt: now()
       },
@@ -87,7 +87,7 @@ export function createSeedState() {
       { id: "pref-challenge", label: "Må gerne udfordre", value: "Tidligere fravalg er præferencer med kontekst, ikke forbud. Holdet må anbefale en undtagelse og forklare hvorfor.", confidence: "bekræftet", source: "Samtale om AI-kontoret" }
     ],
     activity: [
-      activity("developer", "Bygger den vedvarende projekt- og opgavekerne i en separat feature-branch.", "ai-office", "build"),
+      activity("developer", "Afleverede den vedvarende projekt- og opgavekerne i en separat feature-branch.", "ai-office", "build"),
       activity("manager", "Kontoret er klar til at samle næste idé til et arbejdsspor.", "ai-office", "status")
     ]
   };
