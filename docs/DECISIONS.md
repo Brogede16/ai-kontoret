@@ -108,6 +108,18 @@ Denne fil er den korte, menneskelæselige beslutningslog for produktets retning.
 
 **Hvorfor:** En vilkårlig hjemmeside kan sende forespørgsler til `127.0.0.1`. Uden tjekket kunne den oprette data, læse projekter via DNS-rebinding eller bruge Codex-kvote i baggrunden. På macOS' case-insensitive filsystem kunne `/Data/office-state.json` desuden slippe forbi det gamle mappefilter.
 
+## 017 · Ét studie, kontoret viser det valgte projekt
+
+**Beslutning:** Holdet er fælles for alle projekter, men skrivebordene viser kun arbejdet i det projekt, Mads har valgt. Arbejde andre steder nævnes som "N opgaver i andre projekter". Medarbejderens skuffe viser hele køen.
+
+**Hvorfor:** En medarbejder med en opgave i Idébanken så travl ud, mens Mads kiggede på et andet projekt. Det var teknisk sandt, men misvisende.
+
+## 018 · En aflevering er et artefakt med en udfører
+
+**Beslutning:** Opgaver går planlagt → klar → i gang → afleveret. "I gang" kræver et navn på den, der udfører arbejdet (Mads eller en agent uden for kontoret). En aflevering kræver et link/en placering eller et beskrevet tjek og gemmes i biblioteket. Fremdrift er andelen af afleverede opgaver.
+
+**Hvorfor:** Kontoret starter ikke selv modeller endnu. Uden et navn ville "i gang" antyde, at en rolle arbejdede af sig selv.
+
 ## Åbne beslutninger
 
 - Hvilken worker skal først få eksplicit, begrænset adgang: GitHub, en lokal projektmappe eller research?

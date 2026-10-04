@@ -59,19 +59,29 @@ function availabilityLabel(agent) {
   return ({ active: "Arbejder", ready: "Klar", waiting: "Venter", blocked: "Blokeret", bench: "Talentbank" })[agent.availability] || "Klar";
 }
 
+// Kontoret viser det valgte projekt. Arbejde i andre projekter nævnes, men fylder ikke skrivebordet.
+function projectWorkload(agent, projectId) {
+  const open = (office?.tasks || []).filter(task => task.role === agent.id && task.projectId === projectId && ["planned", "ready", "active"].includes(task.state));
+  const count = state => open.filter(task => task.state === state).length;
+  const next = open.find(task => task.state === "active") || open.find(task => task.state === "ready") || open.find(task => task.state === "planned") || null;
+  const total = (agent.workload?.active || 0) + (agent.workload?.ready || 0) + (agent.workload?.planned || 0);
+  return { active: count("active"), ready: count("ready"), planned: count("planned"), next, elsewhere: total - open.length };
+}
+
 // Skrivebordet viser det, opgavekøen faktisk siger. Et gammelt statusfelt får kun lov at stå, når køen er tom.
 function deskStatus(agent) {
-  const work = agent.workload || {};
+  const work = projectWorkload(agent, currentProject()?.id);
   if (agent.availability === "active") return { label: "Arbejder", line: agent.task?.title || agent.status, waiting: false };
   if (work.active) return { label: "I gang", line: work.next?.title || "Opgave i gang", waiting: false };
   if (work.ready) return { label: `${work.ready} klar`, line: work.next?.title || "Opgave klar", waiting: false };
   if (work.planned) return { label: `${work.planned} planlagt`, line: work.next?.title || "Afventer din beslutning", waiting: true };
+  if (work.elsewhere) return { label: "Ledig her", line: `${work.elsewhere} opgave${work.elsewhere === 1 ? "" : "r"} i andre projekter`, waiting: true };
   if (agent.availability === "bench") return { label: "Talentbank", line: "Ikke på en opgave", waiting: true };
   return { label: "Ledig", line: agent.id === "manager" ? (agent.task?.title || "Klar til næste idé") : "Ingen opgave i køen", waiting: true };
 }
 
-function workloadText(agent) {
-  const work = agent.workload || {};
+function workloadText(agent, projectId = null) {
+  const work = projectId ? projectWorkload(agent, projectId) : agent.workload || {};
   const parts = [work.active && `${work.active} i gang`, work.ready && `${work.ready} klar`, work.planned && `${work.planned} planlagt`].filter(Boolean);
   return parts.length ? parts.join(" · ") : "Ingen åbne opgaver";
 }
@@ -105,8 +115,9 @@ function render() {
 function renderOffice() {
   const project = currentProject();
   const agents = Object.values(office.agents);
-  const active = agents.filter(agent => agent.availability === "active" || agent.workload?.active).length;
-  const ready = agents.filter(agent => agent.workload?.ready).length;
+  const here = agent => projectWorkload(agent, project?.id);
+  const active = agents.filter(agent => agent.availability === "active" || here(agent).active).length;
+  const ready = agents.filter(agent => here(agent).ready).length;
   const todayTitle = document.querySelector(".today-card strong");
   const todaySubtitle = document.querySelector(".today-card span");
   const todayProgress = document.querySelector(".tiny-progress i");
@@ -117,8 +128,8 @@ function renderOffice() {
   todaySubtitle.textContent = project ? `${project.activeCount} aktiv · ${project.readyCount} klar` : "Vælg et projekt";
   todayProgress.style.width = `${project?.progress || 0}%`;
   navCount.textContent = office.projects.length;
-  footer.innerHTML = `<i class="status-dot"></i> ${active ? `${active} arbejder` : "Ingen arbejder lige nu"} · ${ready} med en opgave klar`;
-  document.querySelector(".stage-header .eyebrow").textContent = serverOnline ? "Stueetage · synkroniseret" : "Stueetage · forbindelsen er tabt";
+  footer.innerHTML = `<i class="status-dot"></i> ${escapeHtml(project?.name || "Kontoret")}: ${active ? `${active} i gang` : "intet i gang"} · ${ready} med en opgave klar`;
+  document.querySelector(".stage-header .eyebrow").textContent = serverOnline ? `Stueetage · viser ${project?.name || "hele holdet"}` : "Stueetage · forbindelsen er tabt";
 
   agents.forEach(agent => {
     const desk = document.querySelector(`[data-agent="${agent.id}"]`);
@@ -126,7 +137,7 @@ function renderOffice() {
     const status = deskStatus(agent);
     desk.querySelector("strong").textContent = agent.name;
     desk.querySelector("small").textContent = status.line;
-    desk.classList.toggle("is-working", agent.availability === "active" || Boolean(agent.workload?.active));
+    desk.classList.toggle("is-working", agent.availability === "active" || Boolean(here(agent).active));
     const presence = desk.querySelector(".presence");
     presence.classList.toggle("waiting", status.waiting);
     presence.innerHTML = `<i></i> ${escapeHtml(status.label)}`;
@@ -146,7 +157,7 @@ function renderCrew() {
   const specialists = (project?.people || []).filter(id => !coreTeam.includes(id)).map(getAgent).filter(Boolean);
   crew.hidden = !specialists.length;
   if (!specialists.length) { crew.innerHTML = ""; return; }
-  crew.innerHTML = `<span class="crew-label">Hentet ind på ${escapeHtml(project.name)}</span>${specialists.map(agent => `<button class="crew-member" data-agent-open="${escapeHtml(agent.id)}" aria-label="Åbn ${escapeHtml(agent.name)}">${face(agent, true)}<span><strong>${escapeHtml(agent.name)}</strong><small>${escapeHtml(workloadText(agent))} · ikke forbundet</small></span></button>`).join("")}`;
+  crew.innerHTML = `<span class="crew-label">Hentet ind på ${escapeHtml(project.name)}</span>${specialists.map(agent => `<button class="crew-member" data-agent-open="${escapeHtml(agent.id)}" aria-label="Åbn ${escapeHtml(agent.name)}">${face(agent, true)}<span><strong>${escapeHtml(agent.name)}</strong><small>${escapeHtml(workloadText(agent, project.id))} · ikke forbundet</small></span></button>`).join("")}`;
 }
 
 function renderProjects() {
