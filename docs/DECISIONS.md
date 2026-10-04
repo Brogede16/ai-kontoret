@@ -80,6 +80,12 @@ Denne fil er den korte, menneskelæselige beslutningslog for produktets retning.
 
 **Grænse:** Manageren må kun bemande blandt allerede godkendte kompetencepakker. Ny software, login, modeludbyder, betalt plan eller skriveadgang er stadig en beslutning til Mads.
 
+## 013 · Roller og forbindelser vises hver for sig
+
+**Beslutning:** Talentbanken viser de roller manageren kan bemande, mens en særskilt forbindelsesoversigt viser de lokale CLI- eller app-forbindelser, som faktisk er konfigureret og deres konkrete scope.
+
+**Hvorfor:** En medarbejderrolle må ikke ligne en aktiv model, før login, rettigheder, kvote og output-kontrakt er afklaret. Det forebygger både falsk status og for brede tilladelser.
+
 ## Åbne beslutninger
 
 - Hvilken worker skal først få eksplicit, begrænset adgang: GitHub, en lokal projektmappe eller research?

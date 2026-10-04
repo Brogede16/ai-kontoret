@@ -50,6 +50,8 @@ Manager, designer, researcher, udvikler, reviewer, spildesigner, grafiker, tekst
 
 Manageren må frit sammensætte et projektteam fra talentbanken og tilføje relevante roller, når opgaven fortjener det. En “ansættelse” betyder en projektrolle med en klar aflevering og en begrænset kompetencepakke — ikke automatisk installation af software, aktivering af en betalt model eller nye skrive-/deployrettigheder.
 
+Kontoret viser separat, hvilke lokale worker-forbindelser der faktisk er konfigureret. Det gør det tydeligt, når en rolle er klar i organisationen, men endnu ikke kan udføre arbejde gennem Claude Code, Gemini CLI eller en anden underliggende worker.
+
 ## Mads-profilen
 
 Tidligere valg er bløde præferencer med kontekst — ikke forbud. En medarbejder skal kunne sige: "Du fravalgte dette i projekt X, men her anbefaler jeg det af denne grund." Kun eksplicitte sikkerheds- og økonomiregler er hårde stopregler.

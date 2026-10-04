@@ -173,6 +173,15 @@ function openTalentPool() {
   openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">✦</span><div><p class="eyebrow">Godkendte kompetencepakker</p><h2>Talentbanken</h2><p>Manageren kan sætte en specialist på et projekt, når rollen giver en bedre aflevering.</p></div></div><div class="talent-grid">${talents.map(agent => `<article class="talent-card"><div class="talent-card-head">${face(agent)}<div><span>${escapeHtml(availabilityLabel(agent))}</span><h3>${escapeHtml(agent.name)}</h3><p>${escapeHtml(agent.role)}</p></div></div><p>${escapeHtml(agent.task?.description || agent.message)}</p><div class="competency-chips">${(agent.competencies || []).map(item => `<span>${escapeHtml(item)}</span>`).join("")}</div><div class="talent-card-actions"><button data-open-agent="${escapeHtml(agent.id)}">Se profil</button><button data-compose="${escapeHtml(agent.id)}">Bed manageren vurdere</button></div></article>`).join("")}</div><div class="drawer-message"><strong>Vigtigt lige nu</strong>Disse er projektroller, ikke aktive LLM-forbindelser. En opgave kan planlægges og blive klar, men ingen ekstern model eller adgang bliver startet herfra.</div>`);
 }
 
+function connectorStateLabel(connector) {
+  return connector.state === "configured" ? "Konfigureret" : "Ikke forbundet";
+}
+
+function openConnections() {
+  const connectors = Object.values(office?.connectors || {});
+  openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">⌁</span><div><p class="eyebrow">Lokale worker-forbindelser</p><h2>Forbindelser</h2><p>En rolle og dens underliggende model er to forskellige ting. Kun faktiske forbindelser står her.</p></div></div><div class="connection-list">${connectors.length ? connectors.map(connector => `<article class="connection-card ${escapeHtml(connector.state)}"><div><span>${escapeHtml(connector.provider)}</span><h3>${escapeHtml(connector.name)}</h3><p>${escapeHtml(connector.mode)}</p></div><b>${escapeHtml(connectorStateLabel(connector))}</b><p>${escapeHtml(connector.status)}</p><div class="connection-scope"><strong>Grænse lige nu</strong>${escapeHtml(connector.scope)}</div><div class="connection-roles">${(connector.roles || []).map(role => `<span>${escapeHtml(role)}</span>`).join("")}</div><small>${escapeHtml(connector.note)}</small></article>`).join("") : "<div class='empty-state'>Ingen forbindelser er registreret endnu.</div>"}</div><div class="drawer-message"><strong>Næste sikre skridt</strong>At tilkoble Claude Code eller Gemini CLI kræver en særskilt lokal login- og tilladelsesbeslutning. Dette kontrolrum må ikke gøre det automatisk.</div>`);
+}
+
 function stateLabel(task) {
   return ({ active: "Arbejder", ready: "Klar", planned: "Planlagt", done: "Færdig", blocked: "Blokeret" })[task.state] || "Planlagt";
 }
@@ -483,6 +492,7 @@ document.querySelectorAll("[data-nav]").forEach(button => button.addEventListene
   if (button.dataset.nav === "history") openActivity();
   if (button.dataset.nav === "library") openLibrary();
   if (button.dataset.nav === "talent") openTalentPool();
+  if (button.dataset.nav === "connections") openConnections();
 }));
 
 function openInboxDrawer() {

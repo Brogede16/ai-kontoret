@@ -15,7 +15,7 @@ function activity(actorId, text, projectId = null, kind = "status") {
 
 export function createSeedState() {
   return {
-    version: 3,
+    version: 4,
     updatedAt: now(),
     activeProjectId: "ai-office",
     agents: {
@@ -80,6 +80,23 @@ export function createSeedState() {
         competencies: ["Målgruppe", "Positionering", "Værditilbud", "Launch-hypoteser"],
         handoff: "Afleverer en målgruppe- og positioneringsnote. Udfører aldrig køb, annoncering eller publicering.",
         message: "Jeg kan skærpe, hvem produktet er til, og hvordan det forklares. Jeg må aldrig selv udgive, købe annoncer eller starte en kampagne."
+      }
+    },
+    connectors: {
+      codex: {
+        id: "codex", name: "Codex", provider: "OpenAI · ChatGPT", state: "configured", mode: "Lokal Codex-manager",
+        status: "Konfigureret lokalt · read-only", scope: "Kan kun formulere managerens oplæg gennem den eksisterende lokale Codex-login. Ingen fil-, GitHub-, Render-, Xcode- eller deployadgang.",
+        roles: ["Manager", "senere kode/review"], note: "Ingen API-nøgle eller separat API-regning er lagt ind i kontoret."
+      },
+      claude_code: {
+        id: "claude_code", name: "Claude Code", provider: "Anthropic", state: "unconfigured", mode: "Lokal CLI-worker",
+        status: "Ikke forbundet", scope: "Ingen login, kommando eller rettighed er konfigureret fra kontoret.",
+        roles: ["Research", "design", "kode", "review"], note: "Kan senere tilkobles med en eksplicit lokal login- og tilladelsesprofil."
+      },
+      gemini_cli: {
+        id: "gemini_cli", name: "Gemini CLI", provider: "Google", state: "unconfigured", mode: "Lokal CLI-worker",
+        status: "Ikke forbundet", scope: "Ingen login, kommando eller rettighed er konfigureret fra kontoret.",
+        roles: ["Research", "indhold", "modspil"], note: "Den konkrete Google-plan og CLI-adgang skal først valideres lokalt, før den kan sættes på arbejde."
       }
     },
     projects: [
@@ -175,10 +192,15 @@ export function createOfficeStore(filePath) {
       for (const [agentId, profile] of Object.entries(seedAgents)) {
         if (!state.agents[agentId]) state.agents[agentId] = profile;
       }
+      if (!state.connectors || typeof state.connectors !== "object") state.connectors = {};
+      const seedConnectors = createSeedState().connectors;
+      for (const [connectorId, profile] of Object.entries(seedConnectors)) {
+        if (!state.connectors[connectorId]) state.connectors[connectorId] = profile;
+      }
       if (!Array.isArray(state.libraryItems)) state.libraryItems = [];
       if (!Array.isArray(state.conversations)) state.conversations = [];
       if (!Array.isArray(state.presentations)) state.presentations = [];
-      state.version = Math.max(Number(state.version) || 1, 3);
+      state.version = Math.max(Number(state.version) || 1, 4);
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
       state = createSeedState();
