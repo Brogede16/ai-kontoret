@@ -37,7 +37,7 @@
 
         <button class="profile-button" id="profile-button">
           <span class="avatar">M</span>
-          <span><strong>Mads</strong><small>Chef · online</small></span>
+          <span><strong>Mads</strong><small>Chef · se profil</small></span>
           <span aria-hidden="true">···</span>
         </button>
       </aside>
@@ -45,13 +45,13 @@
       <main class="main-content">
         <header class="topbar">
           <div>
-            <p class="eyebrow">Lørdag, 4. oktober</p>
-            <h1>Godmorgen, Mads <span aria-hidden="true">✦</span></h1>
+            <p class="eyebrow" id="today-date">&nbsp;</p>
+            <h1><span id="greeting">Hej</span>, Mads <span aria-hidden="true">✦</span></h1>
           </div>
           <div class="top-actions">
             <div class="office-status"><i></i><span>Forbinder lokalt</span></div>
-            <button class="icon-button" id="theme-button" aria-label="Skift stemning">☼</button>
-            <button class="icon-button" id="open-inbox" aria-label="Åbn indbakke">⌁<b id="inbox-count">2</b></button>
+            <button class="icon-button" id="theme-button" aria-label="Skift mellem dag- og aftenlys" aria-pressed="false">☼</button>
+            <button class="icon-button" id="open-inbox" aria-label="Åbn indbakke">⌁<b id="inbox-count">0</b></button>
           </div>
         </header>
 
@@ -64,18 +64,17 @@
           </form>
           <input id="attachment-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
           <button class="chat-history-button" id="chat-history" aria-label="Åbn projektsamtalen">☷<span>Samtale</span></button>
-          <button class="voice-button" aria-label="Indtal besked">◉</button>
         </section>
 
         <section class="office-layout">
           <section class="office-stage" id="office" aria-label="Det levende AI-kontor">
             <div class="stage-header">
               <div>
-                <p class="eyebrow">Stueetage · forbinder</p>
+                <p class="eyebrow">Stueetage</p>
                 <h2>Det levende kontor</h2>
               </div>
               <div class="stage-controls">
-                <button class="small-button" id="focus-button">✦ Fokus-tilstand</button>
+                <button class="small-button" id="focus-button" aria-pressed="false" title="Viser kun direktionsbeslutninger i indbakken">✦ Fokus-tilstand</button>
                 <button class="small-button outline" id="meeting-button">○ Kald møde</button>
               </div>
             </div>
@@ -86,56 +85,58 @@
               <div class="room-label meeting-label">Møderum</div>
               <div class="room-label lounge-label">Bibliotek</div>
 
-              <button class="desk agent-card manager" data-agent="manager" style="--x: 7%; --y: 25%;" aria-label="Åbn Manageren">
+              <button class="desk agent-card manager" data-agent="manager" style="--x: 14%; --y: 12%;" aria-label="Åbn Manageren">
                 <span class="agent-face manager-face">M</span>
-                <span class="presence"><i></i> Planlægger</span>
+                <span class="presence waiting"><i></i> Indlæser</span>
                 <strong>Manageren</strong>
-                <small>Samler dagens arbejde</small>
+                <small>Henter status…</small>
                 <span class="desk-shadow"></span>
               </button>
 
-              <button class="desk agent-card designer" data-agent="designer" style="--x: 37%; --y: 23%;" aria-label="Åbn designeren">
+              <button class="desk agent-card designer" data-agent="designer" style="--x: 44%; --y: 12%;" aria-label="Åbn designeren">
                 <span class="agent-face designer-face">D</span>
-                <span class="presence"><i></i> Skitserer</span>
+                <span class="presence waiting"><i></i> Indlæser</span>
                 <strong>Designeren</strong>
-                <small>UI-retning B</small>
+                <small>Henter status…</small>
                 <span class="desk-shadow"></span>
               </button>
 
-              <button class="desk agent-card researcher" data-agent="researcher" style="--x: 68%; --y: 23%;" aria-label="Åbn researcheren">
+              <button class="desk agent-card researcher" data-agent="researcher" style="--x: 74%; --y: 12%;" aria-label="Åbn researcheren">
                 <span class="agent-face researcher-face">R</span>
-                <span class="presence"><i></i> Undersøger</span>
+                <span class="presence waiting"><i></i> Indlæser</span>
                 <strong>Researcheren</strong>
-                <small>Koncertpublikum</small>
+                <small>Henter status…</small>
                 <span class="desk-shadow"></span>
               </button>
 
-              <button class="desk agent-card developer" data-agent="developer" style="--x: 23%; --y: 63%;" aria-label="Åbn udvikleren">
+              <button class="desk agent-card developer" data-agent="developer" style="--x: 27%; --y: 64%;" aria-label="Åbn udvikleren">
                 <span class="agent-face developer-face">U</span>
-                <span class="presence"><i></i> Bygger</span>
+                <span class="presence waiting"><i></i> Indlæser</span>
                 <strong>Udvikleren</strong>
-                <small>Onboarding-flow</small>
+                <small>Henter status…</small>
                 <span class="desk-shadow"></span>
               </button>
 
-              <button class="desk agent-card reviewer" data-agent="reviewer" style="--x: 53%; --y: 65%;" aria-label="Åbn revieweren">
+              <button class="desk agent-card reviewer" data-agent="reviewer" style="--x: 62%; --y: 64%;" aria-label="Åbn revieweren">
                 <span class="agent-face reviewer-face">Q</span>
-                <span class="presence waiting"><i></i> Venter</span>
+                <span class="presence waiting"><i></i> Indlæser</span>
                 <strong>Revieweren</strong>
-                <small>Klar til næste review</small>
+                <small>Henter status…</small>
                 <span class="desk-shadow"></span>
               </button>
 
               <button class="meeting-table" id="table-button" aria-label="Åbn møderummet">
-                <span>✦</span><strong>Idé-møde</strong><small>Klar når I er</small>
+                <span>✦</span><strong>Møderum</strong><small>Kun ved reel afhængighed</small>
               </button>
               <div class="plant plant-one" aria-hidden="true">♧</div>
               <div class="plant plant-two" aria-hidden="true">♧</div>
               <div class="bookshelf" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
             </div>
 
+            <div class="project-crew" id="project-crew" hidden></div>
+
             <div class="office-footer">
-              <span><i class="status-dot"></i> 4 arbejder · 1 klar</span>
+              <span><i class="status-dot"></i> Henter holdets status…</span>
               <button id="view-activity">Se dagens aktivitet <span>→</span></button>
             </div>
           </section>

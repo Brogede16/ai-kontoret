@@ -94,6 +94,20 @@ Denne fil er den korte, menneskelæselige beslutningslog for produktets retning.
 
 **Grænse:** Først en særskilt, begrænset worker-forbindelse må læse et bestemt billede. Indtil da er billedet kun synligt for Mads i det lokale kontrolrum.
 
+## 015 · Status udledes, den gemmes ikke bare
+
+**Beslutning:** En medarbejders synlige status på skrivebordet udledes af opgavekøen (i gang, klar, planlagt). Et fravalgt oplæg markerer sine opgaver som `dropped`. Manageren afviser et svar uden for schemaet i stedet for at gætte en plan. Når Codex mangler, siger kontoret det.
+
+**Hvorfor:** Gemte statusfelter blev aldrig nulstillet og kunne vise en travl medarbejder uden arbejde. Det strider mod princippet om kun at vise reel arbejdsstatus.
+
+**Grænse:** Et visningsvalg som fokus-tilstand ændrer kun, hvad Mads ser. Det får ikke manageren til at handle anderledes.
+
+## 016 · Lokal-only betyder også beskyttet mod andre faner
+
+**Beslutning:** Serveren tjekker `Host`, `Origin` og `Content-Type` og serverer kun en fast liste af browserfiler.
+
+**Hvorfor:** En vilkårlig hjemmeside kan sende forespørgsler til `127.0.0.1`. Uden tjekket kunne den oprette data, læse projekter via DNS-rebinding eller bruge Codex-kvote i baggrunden. På macOS' case-insensitive filsystem kunne `/Data/office-state.json` desuden slippe forbi det gamle mappefilter.
+
 ## Åbne beslutninger
 
 - Hvilken worker skal først få eksplicit, begrænset adgang: GitHub, en lokal projektmappe eller research?

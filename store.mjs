@@ -166,7 +166,8 @@ export function tasksForProject(state, projectId) {
 }
 
 export function projectSummary(state, project) {
-  const tasks = tasksForProject(state, project.id);
+  // Fravalgte opgaver er historik, ikke arbejde. De tæller hverken i antal eller fremdrift.
+  const tasks = tasksForProject(state, project.id).filter(task => task.state !== "dropped");
   const active = tasks.filter(task => task.state === "active").length;
   const ready = tasks.filter(task => task.state === "ready").length;
   const done = tasks.filter(task => task.state === "done").length;

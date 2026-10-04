@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { extname, join, normalize } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -14,15 +14,22 @@ const store = createOfficeStore(process.env.OFFICE_STATE_PATH || join(root, "dat
 const maxMessageLength = 2_500;
 const maxRunMs = 120_000;
 const maxAttachmentBytes = 2 * 1024 * 1024;
+const codexBinary = process.env.CODEX_BIN || "codex";
 const eventClients = new Set();
 let activeRun = false;
+let codexAvailable = null;
 const assignableRoles = new Set(["designer", "researcher", "developer", "reviewer", "game_designer", "graphic_designer", "copywriter", "marketer"]);
 const imageExtensions = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
 
-const types = {
-  ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8", ".svg": "image/svg+xml"
+// Kun browserens egne filer serveres. Kildekode, .git, data og docs bliver aldrig udleveret over HTTP.
+const staticFiles = {
+  "/": ["index.html", "text/html; charset=utf-8"],
+  "/index.html": ["index.html", "text/html; charset=utf-8"],
+  "/app.js": ["app.js", "text/javascript; charset=utf-8"],
+  "/styles.css": ["styles.css", "text/css; charset=utf-8"],
+  "/enhancements.css": ["enhancements.css", "text/css; charset=utf-8"]
 };
+const allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
 
 function json(response, status, body) {
   response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
@@ -33,13 +40,46 @@ function notFound(response) { return json(response, 404, { error: "Vi kunne ikke
 
 function readBody(request, maxBytes = 32_000) {
   return new Promise((resolve, reject) => {
-    let data = "";
+    const chunks = [];
+    let size = 0;
+    let tooLarge = false;
     request.on("data", chunk => {
-      data += chunk;
-      if (data.length > maxBytes) reject(new Error("Beskeden er for stor."));
+      if (tooLarge) return;
+      size += chunk.length;
+      if (size > maxBytes) {
+        tooLarge = true;
+        chunks.length = 0;
+        return reject(new Error("Beskeden er for stor."));
+      }
+      chunks.push(chunk);
     });
-    request.on("end", () => resolve(data));
+    request.on("end", () => { if (!tooLarge) resolve(Buffer.concat(chunks).toString("utf8")); });
     request.on("error", reject);
+  });
+}
+
+// Serveren lytter kun på 127.0.0.1, men en hvilken som helst hjemmeside i Mads' browser kan stadig sende
+// forespørgsler dertil. Host-tjekket stopper DNS-rebinding; Origin- og JSON-kravet stopper skjulte
+// cross-site POSTs, som ellers kunne oprette data eller bruge Codex-kvote i baggrunden.
+function rejectForeignRequest(request) {
+  if (!allowedHosts.has(request.headers.host || "")) return "Ukendt værtsnavn. Åbn kontoret på http://127.0.0.1.";
+  if (request.method === "GET" || request.method === "HEAD") return null;
+  const origin = request.headers.origin;
+  if (origin && !allowedHosts.has(origin.replace(/^http:\/\//, ""))) return "Forespørgslen kom ikke fra kontoret selv.";
+  if (!/^application\/json\b/i.test(request.headers["content-type"] || "")) return "Kontoret tager kun imod JSON fra sin egen side.";
+  return null;
+}
+
+function checkCodex() {
+  if (codexAvailable !== null) return Promise.resolve(codexAvailable);
+  return new Promise(resolve => {
+    const done = value => { codexAvailable = value; resolve(value); };
+    try {
+      const child = spawn(codexBinary, ["--version"], { stdio: "ignore" });
+      const timer = setTimeout(() => { child.kill("SIGTERM"); done(false); }, 5_000);
+      child.on("error", () => { clearTimeout(timer); done(false); });
+      child.on("close", code => { clearTimeout(timer); done(code === 0); });
+    } catch { done(false); }
   });
 }
 
@@ -72,9 +112,27 @@ function decisionView(decision) {
   };
 }
 
+const openTaskStates = new Set(["planned", "ready", "active"]);
+
+// Skrivebordenes status udledes af de rigtige opgaver, så et gammelt statusfelt aldrig lever videre alene.
+function agentWorkload(state, agentId) {
+  const open = state.tasks.filter(task => task.role === agentId && openTaskStates.has(task.state));
+  const pick = stateName => open.find(task => task.state === stateName);
+  const next = pick("active") || pick("ready") || pick("planned") || null;
+  return {
+    active: open.filter(task => task.state === "active").length,
+    ready: open.filter(task => task.state === "ready").length,
+    planned: open.filter(task => task.state === "planned").length,
+    next: next ? { id: next.id, title: next.title, state: next.state, projectId: next.projectId } : null
+  };
+}
+
 function officeView(state) {
+  const agents = Object.fromEntries(Object.entries(state.agents).map(([agentId, agent]) => [agentId, { ...agent, workload: agentWorkload(state, agentId) }]));
   return {
     ...state,
+    agents,
+    managerAvailable: codexAvailable === true,
     projects: state.projects.map(project => projectSummary(state, project)),
     decisions: state.decisions.filter(decision => decision.status === "open").map(decisionView)
   };
@@ -125,34 +183,35 @@ Beslutningsniveau: Vælg "executive" kun for retning, smag med stor effekt, væs
 Vigtige regler: Du må ikke påstå, at medarbejdere allerede er startet, at du har set en vedhæftning, læst en ekstern konto, ændret filer eller lavet deploy. Du er kun i læse- og rådgivningstilstand. Lav ikke skjult ræsonnement eller værktøjslog i svaret.`;
 }
 
-function parsePlan(message) {
-  try {
-    const parsed = JSON.parse(message);
-    if (!parsed.summary || !Array.isArray(parsed.roles) || !parsed.nextAction || !parsed.decision) throw new Error("mangler felter");
-    return {
-      summary: parsed.summary,
-      roles: [...new Set(parsed.roles.filter(role => assignableRoles.has(role)))].slice(0, 3),
-      nextAction: parsed.nextAction,
-      question: parsed.question || null,
-      decision: {
-        level: parsed.decision.level === "executive" ? "executive" : "team",
-        title: parsed.decision.title,
-        recommendation: parsed.decision.recommendation,
-        tradeoff: parsed.decision.tradeoff,
-        urgency: parsed.decision.urgency
-      }
-    };
-  } catch {
-    return {
-      summary: message.trim(), roles: ["researcher", "designer"], nextAction: "Saml et kort oplæg, før holdet går videre.", question: null,
-      decision: { level: "team", title: "Godkend næste arbejdsspor", recommendation: "Start med et kort, afgrænset oplæg.", tradeoff: "Det giver mere retning før udførelse, men udskyder selve byggetiden lidt.", urgency: "when_ready" }
-    };
+// Et svar uden for schemaet bliver afvist i stedet for at blive gættet om til en plan.
+// Kontoret må hellere sige "prøv igen" end vise roller og beslutninger, manageren aldrig foreslog.
+export function parsePlan(message) {
+  let parsed;
+  try { parsed = JSON.parse(message); } catch { parsed = null; }
+  const text = value => (typeof value === "string" ? value.trim() : "");
+  const roles = Array.isArray(parsed?.roles) ? [...new Set(parsed.roles.filter(role => assignableRoles.has(role)))].slice(0, 3) : [];
+  const decision = parsed?.decision || {};
+  if (!text(parsed?.summary) || !text(parsed?.nextAction) || !roles.length || !text(decision.title) || !text(decision.recommendation)) {
+    throw new Error("Manageren svarede ikke i det aftalte format. Intet er gemt — prøv igen.");
   }
+  return {
+    summary: text(parsed.summary),
+    roles,
+    nextAction: text(parsed.nextAction),
+    question: text(parsed.question) || null,
+    decision: {
+      level: decision.level === "executive" ? "executive" : "team",
+      title: text(decision.title),
+      recommendation: text(decision.recommendation),
+      tradeoff: text(decision.tradeoff) || "Ingen afvejning er dokumenteret.",
+      urgency: ["now", "today", "when_ready"].includes(decision.urgency) ? decision.urgency : "when_ready"
+    }
+  };
 }
 
 function runManager(message, project, projectTasks, projectReferences, conversationHistory, preferences, previousDecision) {
   return new Promise((resolve, reject) => {
-    const child = spawn("codex", [
+    const child = spawn(codexBinary, [
       "exec", "--json", "--sandbox", "read-only", "--ephemeral", "--cd", root,
       "--output-schema", join(root, "schemas", "manager-plan.schema.json"),
       managerPrompt(message, project, projectTasks, projectReferences, conversationHistory, preferences, previousDecision)
@@ -193,31 +252,32 @@ function runManager(message, project, projectTasks, projectReferences, conversat
       consumeLines();
       if (code !== 0) return finish(new Error("Manageren kunne ikke starte. Tjek Codex-login og prøv igen."));
       if (!agentMessage.trim()) return finish(new Error("Manageren kom ikke tilbage med et svar. Prøv igen."));
-      finish(null, { plan: parsePlan(agentMessage), usage });
+      try { finish(null, { plan: parsePlan(agentMessage), usage }); }
+      catch (error) { finish(error); }
     });
   });
 }
 
 async function serveStatic(pathname, response) {
-  const requested = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
-  const safePath = normalize(requested).replace(/^\.\.([/\\]|$)+/, "");
-  if (safePath.startsWith("data/") || safePath.startsWith("schemas/")) return notFound(response);
-  const filePath = join(root, safePath);
-  if (!filePath.startsWith(root)) return json(response, 403, { error: "Ikke tilladt." });
+  const entry = staticFiles[pathname];
+  if (!entry) return notFound(response);
   try {
-    const content = await readFile(filePath);
-    response.writeHead(200, { "Content-Type": types[extname(filePath)] || "application/octet-stream" });
+    const content = await readFile(join(root, entry[0]));
+    response.writeHead(200, { "Content-Type": entry[1], "Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" });
     response.end(content);
   } catch { notFound(response); }
 }
 
-function openEventStream(request, response) {
+async function openEventStream(request, response) {
   response.writeHead(200, {
     "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", "Connection": "keep-alive", "X-Accel-Buffering": "no"
   });
   response.write("retry: 3000\n\n");
+  // En fane, der genopretter forbindelsen efter en genstart, får straks den aktuelle tilstand.
+  response.write(`event: office-state\ndata: ${JSON.stringify(officeView(await store.snapshot()))}\n\n`);
   eventClients.add(response);
-  request.on("close", () => eventClients.delete(response));
+  const heartbeat = setInterval(() => response.write(": puls\n\n"), 25_000);
+  request.on("close", () => { clearInterval(heartbeat); eventClients.delete(response); });
 }
 
 async function createProject(body) {
@@ -238,9 +298,11 @@ async function createProject(body) {
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, `http://${host}:${port}`);
   const segments = url.pathname.split("/").filter(Boolean);
+  const refusal = rejectForeignRequest(request);
+  if (refusal) return json(response, 403, { error: refusal });
 
   if (request.method === "GET" && url.pathname === "/api/events") return openEventStream(request, response);
-  if (request.method === "GET" && url.pathname === "/api/health") return json(response, 200, { ok: true, busy: activeRun, worker: "Codex · read-only", localOnly: true });
+  if (request.method === "GET" && url.pathname === "/api/health") return json(response, 200, { ok: true, busy: activeRun, worker: "Codex · read-only", managerAvailable: await checkCodex(), localOnly: true });
   if (request.method === "GET" && url.pathname === "/api/bootstrap") return json(response, 200, { ok: true, office: officeView(await store.snapshot()) });
   if (request.method === "GET" && segments[0] === "api" && segments[1] === "attachments" && segments[2]) {
     const state = await store.snapshot();
@@ -376,11 +438,7 @@ const server = createServer(async (request, response) => {
         if (task.state !== "planned") throw new Error("Kun planlagte opgaver kan klargøres.");
         task.state = "ready";
         task.updatedAt = new Date().toISOString();
-        const agent = state.agents[task.role];
-        if (agent && agent.availability !== "active") {
-          agent.availability = "ready";
-          agent.status = "Har en opgave klar";
-        }
+        markAgentReady(state.agents[task.role]);
         const project = state.projects.find(item => item.id === task.projectId);
         if (project) project.updatedAt = new Date().toISOString();
         addActivity(state, "manager", `Klargjorde “${task.title}”. Den starter først, når en godkendt worker bliver koblet på.`, task.projectId, "task");
@@ -401,15 +459,12 @@ const server = createServer(async (request, response) => {
         decision.status = "resolved";
         decision.choice = choice;
         decision.resolvedAt = new Date().toISOString();
-        if (choice === "primary" && decision.planTaskIds?.length) {
-          for (const taskId of decision.planTaskIds) {
-            const task = state.tasks.find(item => item.id === taskId);
-            if (task && task.state === "planned") task.state = "ready";
-          }
-          for (const role of decision.roles || []) {
-            const agent = state.agents[role];
-            if (agent) { agent.availability = "ready"; agent.status = "Har en opgave klar"; }
-          }
+        const planTasks = (decision.planTaskIds || []).map(taskId => state.tasks.find(item => item.id === taskId)).filter(task => task?.state === "planned");
+        for (const task of planTasks) {
+          // "Ny runde" betyder, at oplægget er fravalgt. Dets opgaver må ikke blive liggende som spøgelsesarbejde.
+          task.state = choice === "primary" ? "ready" : "dropped";
+          task.updatedAt = decision.resolvedAt;
+          if (choice === "primary") markAgentReady(state.agents[task.role]);
         }
         addConversation(state, decision.projectId, "mads", `${choice === "primary" ? "Godkendte" : "Bad om ny runde på"}: ${decision.title}.`, "decision", decision.id);
         addActivity(state, "manager", choice === "primary" ? `Mads godkendte næste arbejdsspor: ${decision.title}.` : `Mads bad om en ny runde på: ${decision.title}.`, decision.projectId, "decision");
@@ -433,7 +488,10 @@ const server = createServer(async (request, response) => {
 
   if (request.method === "POST" && url.pathname === "/api/manager") {
     if (activeRun) return json(response, 429, { error: "Manageren arbejder allerede. Vent på det nuværende svar." });
+    activeRun = true;
+    let started = false;
     try {
+      if (!(await checkCodex())) return json(response, 503, { error: "Manageren er ikke forbundet: Codex blev ikke fundet på denne Mac. Installér og log ind i Codex, og genstart serveren." });
       const body = parseBody(await readBody(request));
       const message = typeof body.message === "string" ? body.message.trim() : "";
       if (!message) return json(response, 400, { error: "Skriv først en besked til manageren." });
@@ -444,17 +502,7 @@ const server = createServer(async (request, response) => {
       const projectReferences = (before.libraryItems || []).filter(item => item.projectId === project?.id).slice(0, 12);
       const conversationHistory = (before.conversations || []).filter(item => item.projectId === project?.id).slice(0, 12);
       const previousDecision = before.decisions.find(item => item.id === body.decisionId && item.status === "open") || null;
-      activeRun = true;
-      if (typeof body.decisionId === "string") {
-        await mutate(state => {
-          const previous = state.decisions.find(item => item.id === body.decisionId && item.status === "open");
-          if (!previous) return;
-          previous.status = "resolved";
-          previous.choice = "reply";
-          previous.resolvedAt = new Date().toISOString();
-          addActivity(state, "manager", "Mads svarede på managerens spørgsmål; den nye plan tager svaret med videre.", previous.projectId, "decision");
-        });
-      }
+      started = true;
       await mutate(state => {
         addConversation(state, project?.id || state.activeProjectId, "mads", message, "message");
         state.agents.manager.availability = "active";
@@ -465,6 +513,18 @@ const server = createServer(async (request, response) => {
       const result = await runManager(message, project, projectTasks, projectReferences, conversationHistory, before.preferences, previousDecision);
       const outcome = await mutate(state => {
         const projectId = project?.id || state.activeProjectId;
+        // Spørgsmålet lukkes først, når der faktisk findes et nyt oplæg. Fejler kørslen, står det stadig i indbakken.
+        const previous = previousDecision && state.decisions.find(item => item.id === previousDecision.id && item.status === "open");
+        if (previous) {
+          previous.status = "resolved";
+          previous.choice = "reply";
+          previous.resolvedAt = new Date().toISOString();
+          for (const taskId of previous.planTaskIds || []) {
+            const task = state.tasks.find(item => item.id === taskId);
+            if (task?.state === "planned") { task.state = "dropped"; task.updatedAt = previous.resolvedAt; }
+          }
+          addActivity(state, "manager", "Mads svarede på managerens spørgsmål; det nye oplæg erstatter det forrige.", previous.projectId, "decision");
+        }
         const mutableProject = state.projects.find(item => item.id === projectId);
         const newlyStaffed = mutableProject
           ? result.plan.roles.filter(role => !mutableProject.people.includes(role))
@@ -501,6 +561,7 @@ const server = createServer(async (request, response) => {
       return json(response, 200, { ok: true, ...outcome.result, usage: result.usage, office: officeView(outcome.state) });
     } catch (error) {
       const message = error.message || "Noget gik galt hos manageren.";
+      if (!started) return json(response, 400, { error: message });
       const recovery = await mutate(state => {
         state.agents.manager.availability = "ready";
         state.agents.manager.status = "Klar igen efter en fejl";
@@ -518,9 +579,22 @@ const server = createServer(async (request, response) => {
   return json(response, 405, { error: "Metoden er ikke tilladt." });
 });
 
+function markAgentReady(agent) {
+  if (!agent || agent.availability === "active") return;
+  // En specialist i talentbanken er stadig ikke forbundet, selv om der ligger en opgave klar til rollen.
+  if (agent.availability === "bench") { agent.status = "Har en opgave klar · ikke forbundet"; return; }
+  agent.availability = "ready";
+  agent.status = "Har en opgave klar";
+}
+
 function roleTaskAction(role, nextAction) {
   const prefix = { designer: "formgiv", researcher: "undersøg", developer: "gør klar til at bygge", reviewer: "forbered kvalitetstjek af", game_designer: "afgræns gameplay for", graphic_designer: "læg visuel retning for", copywriter: "formulér tekst til", marketer: "positionér og afgræns" }[role] || "bearbejd";
   return `${prefix} — ${nextAction}`;
 }
 
-store.load().then(() => server.listen(port, host, () => console.log(`AI-kontoret kører på http://${host}:${port}`)));
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  Promise.all([store.load(), checkCodex()]).then(([, codexReady]) => server.listen(port, host, () => {
+    console.log(`AI-kontoret kører på http://${host}:${port}`);
+    if (!codexReady) console.log("Codex blev ikke fundet. Kontoret virker, men manageren kan ikke lave oplæg før Codex er installeret og logget ind.");
+  }));
+}

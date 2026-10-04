@@ -14,6 +14,16 @@ node server.mjs
 
 Serveren giver UI'et en lokal, skrivebeskyttet Codex-manager. Den kræver, at Codex allerede er logget ind på Mac'en. Den bruger den eksisterende ChatGPT/Codex-login, har kun ét aktivt job ad gangen, har en tidsgrænse på to minutter og kan ikke skrive filer, deploye eller bruge API-nøgler.
 
+Hvis Codex ikke findes på Mac'en, starter kontoret stadig. Det viser så "Manageren er ikke forbundet" i stedet for at lade som om, og alt andet end managerens oplæg virker.
+
+### Lokal sikkerhed
+
+Serveren lytter kun på `127.0.0.1`, men det alene beskytter ikke mod andre hjemmesider i samme browser. Derfor:
+
+- afvises forespørgsler med et fremmed `Host`-navn (DNS-rebinding)
+- skal alle POSTs være JSON og må ikke komme fra en fremmed `Origin` (skjulte cross-site-forespørgsler)
+- serveres kun `index.html`, `app.js` og de to stylesheets — aldrig kildekode, `.git`, `data/` eller docs.
+
 ## Det er bygget nu
 
 - Et levende, Game Dev Tycoon-inspireret kontor på desktop og mobil.
@@ -28,6 +38,10 @@ Serveren giver UI'et en lokal, skrivebeskyttet Codex-manager. Den kræver, at Co
 - Vedvarende projekter, opgaver, leverancer, acceptkriterier og et fælles bibliotek med noter, briefs og links — gemt lokalt i `data/office-state.json`, som aldrig commit'es.
 - Lokale referencebilleder (PNG, JPEG, WebP eller GIF op til 2 MB) kan vedhæftes til et projekt og vises i biblioteket. De gemmes under `data/uploads/`, bliver ikke commit'et og er ikke læst af manageren eller sendt til en model.
 - En opgave kan klargøres til en worker, men det starter ikke en model og giver ikke rettigheder.
+- Skrivebordenes status udledes af de rigtige opgaver (i gang, klar, planlagt). En rolle uden opgaver står som ledig, ikke som travl.
+- Specialister fra talentbanken vises i kontoret, når de er sat på det aktive projekt — tydeligt markeret som ikke forbundet.
+- "Bed om ny runde" fravælger oplæggets planlagte opgaver, så de ikke bliver liggende som spøgelsesarbejde.
+- Fokus-tilstand skjuler team-afgørelser fra indbakken, så kun direktionsvalg står tilbage. Aftenlys dæmper kontorkortet. Begge huskes i browseren.
 - Live-synkronisering på tværs af åbne lokale faner, møde-markeringer, fokus-tilstand, medarbejderpaneler og responsiv mobilnavigation.
 
 ## Tjek før aflevering

@@ -1,15 +1,18 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { request as httpRequest } from "node:http";
 import { once } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { createSeedState } from "../store.mjs";
+import { parsePlan } from "../server.mjs";
 
-function startTestServer(port, statePath) {
+function startTestServer(port, statePath, codexBin = "ai-kontoret-codex-findes-ikke") {
   const child = spawn(process.execPath, ["server.mjs"], {
     cwd: new URL("..", import.meta.url),
-    env: { ...process.env, PORT: String(port), OFFICE_STATE_PATH: statePath }
+    env: { ...process.env, PORT: String(port), OFFICE_STATE_PATH: statePath, CODEX_BIN: codexBin }
   });
   return new Promise((resolve, reject) => {
     let output = "";
@@ -34,6 +37,32 @@ function startTestServer(port, statePath) {
       }
     });
   });
+}
+
+function rawRequest(port, path, { method = "GET", headers = {}, body } = {}) {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest({ host: "127.0.0.1", port, path, method, headers }, response => {
+      response.resume();
+      response.on("end", () => resolve(response.statusCode));
+    });
+    req.on("error", reject);
+    req.end(body);
+  });
+}
+
+async function withServer(run, seed, codexBin) {
+  const directory = await mkdtemp(join(tmpdir(), "ai-kontoret-api-"));
+  const statePath = join(directory, "office-state.json");
+  const port = 44000 + Math.floor(Math.random() * 1000);
+  let server;
+  try {
+    if (seed) await writeFile(statePath, JSON.stringify(seed), "utf8");
+    server = await startTestServer(port, statePath, typeof codexBin === "function" ? await codexBin(directory) : codexBin);
+    await run(port);
+  } finally {
+    if (server?.kill("SIGTERM")) await once(server, "exit");
+    await rm(directory, { recursive: true, force: true });
+  }
 }
 
 async function request(port, path, method = "GET", body) {
@@ -104,4 +133,105 @@ test("projekt, bibliotek og opgave flyder gennem den lokale API uden worker-adga
     if (server?.kill("SIGTERM")) await once(server, "exit");
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("fremmede sider kan ikke skrive til det lokale kontor", () => withServer(async port => {
+  const body = JSON.stringify({ name: "Snigprojekt" });
+  assert.equal(await rawRequest(port, "/api/projects", { method: "POST", headers: { "Content-Type": "text/plain" }, body }), 403);
+  assert.equal(await rawRequest(port, "/api/projects", { method: "POST", headers: { "Content-Type": "application/json", Origin: "https://eksempel.dk" }, body }), 403);
+  assert.equal(await rawRequest(port, "/api/bootstrap", { headers: { Host: "angriber.dk:80" } }), 403);
+  assert.equal(await rawRequest(port, "/api/projects", { method: "POST", headers: { "Content-Type": "application/json", Origin: `http://127.0.0.1:${port}` }, body }), 201);
+}));
+
+test("kun browserens egne filer serveres", () => withServer(async port => {
+  assert.equal(await rawRequest(port, "/"), 200);
+  assert.equal(await rawRequest(port, "/app.js"), 200);
+  for (const path of ["/server.mjs", "/store.mjs", "/.git/config", "/data/office-state.json", "/Data/office-state.json", "/AGENTS.md", "/../server.mjs"]) {
+    assert.equal(await rawRequest(port, path), 404, path);
+  }
+}));
+
+test("manageren siger ærligt fra, når Codex ikke findes", () => withServer(async port => {
+  const health = await request(port, "/api/health");
+  assert.equal(health.body.managerAvailable, false);
+  const reply = await request(port, "/api/manager", "POST", { message: "Lav en plan." });
+  assert.equal(reply.status, 503);
+  const office = await request(port, "/api/bootstrap");
+  assert.equal(office.body.office.conversations.some(item => item.text === "Lav en plan."), false);
+  assert.equal(office.body.office.agents.manager.availability, "ready");
+}));
+
+test("en ny runde fravælger oplæggets opgaver i stedet for at efterlade dem", async () => {
+  const seed = createSeedState();
+  const at = "2026-10-04T10:00:00.000Z";
+  seed.tasks.unshift(
+    { id: "task-plan-a", projectId: "ai-office", role: "designer", state: "planned", progress: 0, title: "Designeren: formgiv", description: "", acceptance: "", createdAt: at, updatedAt: at },
+    { id: "task-plan-b", projectId: "ai-office", role: "copywriter", state: "planned", progress: 0, title: "Tekstforfatteren: formulér", description: "", acceptance: "", createdAt: at, updatedAt: at }
+  );
+  seed.decisions.unshift({ id: "decision-plan", projectId: "ai-office", status: "open", level: "team", urgency: "when_ready", title: "Godkend spor", text: "Et oplæg.", recommendation: "Godkend.", tradeoff: "Tid.", primary: "Godkend", secondary: "Bed om ny runde", roles: ["designer", "copywriter"], planTaskIds: ["task-plan-a", "task-plan-b"], createdAt: at });
+
+  await withServer(async port => {
+    const before = await request(port, "/api/bootstrap");
+    assert.equal(before.body.office.agents.designer.workload.planned, 1);
+    const reply = await request(port, "/api/decisions/decision-plan/respond", "POST", { choice: "secondary" });
+    assert.equal(reply.status, 200);
+    const tasks = reply.body.office.tasks.filter(task => task.id.startsWith("task-plan-"));
+    assert.deepEqual(tasks.map(task => task.state), ["dropped", "dropped"]);
+    assert.equal(reply.body.office.agents.designer.workload.planned, 0);
+    assert.equal(reply.body.office.agents.copywriter.availability, "bench");
+  }, seed);
+});
+
+test("en specialist forbliver i talentbanken, selv når dens opgave er klar", async () => {
+  const seed = createSeedState();
+  const at = "2026-10-04T10:00:00.000Z";
+  seed.tasks.unshift({ id: "task-copy", projectId: "ai-office", role: "copywriter", state: "planned", progress: 0, title: "Skriv mikrocopy", description: "", acceptance: "", createdAt: at, updatedAt: at });
+  await withServer(async port => {
+    const reply = await request(port, "/api/tasks/task-copy/ready", "POST", {});
+    assert.equal(reply.status, 200);
+    assert.equal(reply.body.office.agents.copywriter.availability, "bench");
+    assert.equal(reply.body.office.agents.copywriter.workload.ready, 1);
+  }, seed);
+});
+
+test("et svar uden for schemaet bliver afvist i stedet for at blive gættet", () => {
+  assert.throws(() => parsePlan("Jeg synes, vi skal starte med research."), /aftalte format/);
+  assert.throws(() => parsePlan(JSON.stringify({ summary: "x", roles: ["hacker"], nextAction: "y", decision: { title: "t", recommendation: "r" } })), /aftalte format/);
+  const plan = parsePlan(JSON.stringify({ summary: "Kort plan", roles: ["designer", "designer", "copywriter"], nextAction: "Lav to retninger", question: null, decision: { level: "executive", title: "Vælg", recommendation: "A", tradeoff: "Tid", urgency: "snart" } }));
+  assert.deepEqual(plan.roles, ["designer", "copywriter"]);
+  assert.equal(plan.decision.urgency, "when_ready");
+});
+
+// En falsk Codex, der svarer med et gyldigt oplæg. Den kører aldrig en model.
+async function fakeCodex(directory) {
+  const plan = { summary: "Start med en mobilskitse.", roles: ["designer", "copywriter"], nextAction: "Lav to retninger", question: null, decision: { level: "team", title: "Godkend skitsespor", recommendation: "Kør designer først.", tradeoff: "Langsommere kode.", urgency: "today" } };
+  const script = join(directory, "fake-codex.mjs");
+  await writeFile(script, `#!${process.execPath}
+if (process.argv.includes("--version")) process.exit(0);
+console.log("advarsel uden JSON");
+console.log(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: ${JSON.stringify(JSON.stringify(plan))} } }));
+console.log(JSON.stringify({ type: "turn.completed", usage: { input_tokens: 1 } }));
+`, "utf8");
+  await chmod(script, 0o755);
+  return script;
+}
+
+test("managerens oplæg bliver til planlagte opgaver og erstatter et besvaret spørgsmål", async () => {
+  const seed = createSeedState();
+  const at = "2026-10-04T10:00:00.000Z";
+  seed.tasks.unshift({ id: "task-old", projectId: "ai-office", role: "researcher", state: "planned", progress: 0, title: "Gammelt spor", description: "", acceptance: "", createdAt: at, updatedAt: at });
+  seed.decisions.unshift({ id: "decision-question", projectId: "ai-office", status: "open", level: "team", urgency: "now", title: "Til hvem?", text: "Oplæg", recommendation: "Svar", tradeoff: "-", primary: "Svar manageren", secondary: "Bed om ny runde", roles: ["researcher"], planTaskIds: ["task-old"], createdAt: at, plan: { question: "Til hvem?" } });
+
+  await withServer(async port => {
+    assert.equal((await request(port, "/api/health")).body.managerAvailable, true);
+    const reply = await request(port, "/api/manager", "POST", { message: "Til koncertgæster.", projectId: "ai-office", decisionId: "decision-question" });
+    assert.equal(reply.status, 200);
+    const office = reply.body.office;
+    assert.equal(office.decisions.some(item => item.id === "decision-question"), false);
+    assert.equal(office.decisions[0].title, "Godkend skitsespor");
+    assert.equal(office.tasks.find(item => item.id === "task-old").state, "dropped");
+    assert.deepEqual(office.decisions[0].planTaskIds.map(id => office.tasks.find(task => task.id === id).state), ["planned", "planned"]);
+    assert.equal(office.projects.find(item => item.id === "ai-office").people.includes("copywriter"), true);
+    assert.equal(office.agents.manager.availability, "ready");
+  }, seed, fakeCodex);
 });

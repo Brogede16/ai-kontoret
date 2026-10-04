@@ -1,7 +1,11 @@
 let office = null;
-let managerWorkerOnline = false;
+let serverOnline = false;
+let managerAvailable = false;
 let selectedProjectId = null;
 let pendingDecisionId = null;
+let focusMode = readSetting("ai-kontoret:focus") === "1";
+const defaultPlaceholder = "Hvad skal holdet arbejde på?";
+const coreTeam = ["manager", "designer", "researcher", "developer", "reviewer"];
 
 const drawer = document.querySelector("#detail-drawer");
 const drawerContent = document.querySelector("#drawer-content");
@@ -9,6 +13,15 @@ const scrim = document.querySelector("#scrim");
 const toast = document.querySelector("#toast");
 const managerInput = document.querySelector("#manager-input");
 let toastTimer;
+
+// Fokus og lys er personlige visningsvalg. De gemmes kun i denne browser og må gerne forsvinde.
+function readSetting(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+
+function writeSetting(key, value) {
+  try { localStorage.setItem(key, value); } catch { /* Privat vindue eller blokeret lager: valget gælder bare denne visning. */ }
+}
 
 function escapeHtml(value = "") {
   return String(value).replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
@@ -23,8 +36,8 @@ function showToast(message) {
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options
+    ...options,
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) }
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || "Noget gik galt. Prøv igen.");
@@ -46,9 +59,36 @@ function availabilityLabel(agent) {
   return ({ active: "Arbejder", ready: "Klar", waiting: "Venter", blocked: "Blokeret", bench: "Talentbank" })[agent.availability] || "Klar";
 }
 
+// Skrivebordet viser det, opgavekøen faktisk siger. Et gammelt statusfelt får kun lov at stå, når køen er tom.
+function deskStatus(agent) {
+  const work = agent.workload || {};
+  if (agent.availability === "active") return { label: "Arbejder", line: agent.task?.title || agent.status, waiting: false };
+  if (work.ready) return { label: `${work.ready} klar`, line: work.next?.title || "Opgave klar", waiting: false };
+  if (work.planned) return { label: `${work.planned} planlagt`, line: work.next?.title || "Afventer din beslutning", waiting: true };
+  if (agent.availability === "bench") return { label: "Talentbank", line: "Ikke på en opgave", waiting: true };
+  return { label: "Ledig", line: agent.id === "manager" ? (agent.task?.title || "Klar til næste idé") : "Ingen opgave i køen", waiting: true };
+}
+
+function workloadText(agent) {
+  const work = agent.workload || {};
+  const parts = [work.active && `${work.active} i gang`, work.ready && `${work.ready} klar`, work.planned && `${work.planned} planlagt`].filter(Boolean);
+  return parts.length ? parts.join(" · ") : "Ingen åbne opgaver";
+}
+
 function formatTime(iso) {
   if (!iso) return "nu";
-  return new Intl.DateTimeFormat("da-DK", { hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  const date = new Date(iso);
+  const sameDay = date.toDateString() === new Date().toDateString();
+  const options = sameDay ? { hour: "2-digit", minute: "2-digit" } : { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" };
+  return new Intl.DateTimeFormat("da-DK", options).format(date);
+}
+
+function renderToday() {
+  const now = new Date();
+  const hour = now.getHours();
+  const date = new Intl.DateTimeFormat("da-DK", { weekday: "long", day: "numeric", month: "long" }).format(now);
+  document.querySelector("#today-date").textContent = date.charAt(0).toUpperCase() + date.slice(1);
+  document.querySelector("#greeting").textContent = hour < 5 ? "God nat" : hour < 10 ? "Godmorgen" : hour < 18 ? "God dag" : "God aften";
 }
 
 function render() {
@@ -56,14 +96,16 @@ function render() {
   selectedProjectId = selectedProjectId || office.activeProjectId;
   if (!office.projects.some(project => project.id === selectedProjectId)) selectedProjectId = office.activeProjectId;
   renderOffice();
+  renderCrew();
   renderProjects();
   renderDecisions();
 }
 
 function renderOffice() {
   const project = currentProject();
-  const active = Object.values(office.agents).filter(agent => agent.availability === "active").length;
-  const ready = Object.values(office.agents).filter(agent => agent.availability === "ready").length;
+  const agents = Object.values(office.agents);
+  const active = agents.filter(agent => agent.availability === "active" || agent.workload?.active).length;
+  const ready = agents.filter(agent => agent.workload?.ready).length;
   const todayTitle = document.querySelector(".today-card strong");
   const todaySubtitle = document.querySelector(".today-card span");
   const todayProgress = document.querySelector(".tiny-progress i");
@@ -74,21 +116,36 @@ function renderOffice() {
   todaySubtitle.textContent = project ? `${project.activeCount} aktiv · ${project.readyCount} klar` : "Vælg et projekt";
   todayProgress.style.width = `${project?.progress || 0}%`;
   navCount.textContent = office.projects.length;
-  footer.innerHTML = `<i class="status-dot"></i> ${active} arbejder · ${ready} klar`;
-  document.querySelector(".stage-header .eyebrow").textContent = managerWorkerOnline ? "Stueetage · synkroniseret" : "Stueetage · lokal prototype";
+  footer.innerHTML = `<i class="status-dot"></i> ${active ? `${active} arbejder` : "Ingen arbejder lige nu"} · ${ready} med en opgave klar`;
+  document.querySelector(".stage-header .eyebrow").textContent = serverOnline ? "Stueetage · synkroniseret" : "Stueetage · forbindelsen er tabt";
 
-  Object.values(office.agents).forEach(agent => {
+  agents.forEach(agent => {
     const desk = document.querySelector(`[data-agent="${agent.id}"]`);
     if (!desk) return;
+    const status = deskStatus(agent);
     desk.querySelector("strong").textContent = agent.name;
-    desk.querySelector("small").textContent = agent.task?.title || agent.status;
+    desk.querySelector("small").textContent = status.line;
+    desk.classList.toggle("is-working", agent.availability === "active" || Boolean(agent.workload?.active));
     const presence = desk.querySelector(".presence");
-    presence.classList.toggle("waiting", agent.availability === "waiting" || agent.availability === "blocked");
-    presence.innerHTML = `<i></i> ${availabilityLabel(agent)}`;
+    presence.classList.toggle("waiting", status.waiting);
+    presence.innerHTML = `<i></i> ${escapeHtml(status.label)}`;
   });
 
-  const managerStatus = document.querySelector(".office-status span");
-  managerStatus.textContent = managerWorkerOnline ? (office.agents.manager.availability === "active" ? "Manageren arbejder" : "Manageren er online") : "Lokalt kontor";
+  const managerStatus = document.querySelector(".office-status");
+  const managerLabel = !serverOnline ? "Serveren svarer ikke" : !managerAvailable ? "Manageren er ikke forbundet" : office.agents.manager.availability === "active" ? "Manageren arbejder" : "Manageren er klar";
+  managerStatus.querySelector("span").textContent = managerLabel;
+  managerStatus.classList.toggle("offline", !serverOnline || !managerAvailable);
+  managerStatus.title = !managerAvailable && serverOnline ? "Codex blev ikke fundet på denne Mac. Resten af kontoret virker." : "";
+}
+
+// Specialister fra talentbanken får ikke et fast skrivebord. De sidder kun i kontoret, når manageren har sat dem på det aktive projekt.
+function renderCrew() {
+  const crew = document.querySelector("#project-crew");
+  const project = currentProject();
+  const specialists = (project?.people || []).filter(id => !coreTeam.includes(id)).map(getAgent).filter(Boolean);
+  crew.hidden = !specialists.length;
+  if (!specialists.length) { crew.innerHTML = ""; return; }
+  crew.innerHTML = `<span class="crew-label">Hentet ind på ${escapeHtml(project.name)}</span>${specialists.map(agent => `<button class="crew-member" data-agent-open="${escapeHtml(agent.id)}" aria-label="Åbn ${escapeHtml(agent.name)}">${face(agent, true)}<span><strong>${escapeHtml(agent.name)}</strong><small>${escapeHtml(workloadText(agent))} · ikke forbundet</small></span></button>`).join("")}`;
 }
 
 function renderProjects() {
@@ -106,10 +163,17 @@ function renderDecisions() {
   const decisions = office.decisions || [];
   const executive = decisions.filter(item => item.level === "executive");
   const team = decisions.filter(item => item.level !== "executive");
-  list.innerHTML = decisions.length ? `${decisionGroup("Direktion", "Retning, smag og valg med stor effekt.", executive)}${decisionGroup("Team-afgørelser", "Mindre, reversibelt arbejde du kan tage, når det passer.", team)}` : `<div class="empty-state">Alt er afklaret lige nu. Manageren kan fortsætte med det, der er klart.</div>`;
-  document.querySelector("#inbox-count").textContent = decisions.length;
-  document.querySelector("#panel-count").textContent = decisions.length;
-  document.querySelector("#decision-intro").textContent = executive.length ? `${executive.length} direktionsvalg venter. Team-afgørelser kan tages, når du har tid.` : "Ingen store valg venter. De mindre team-afgørelser er samlet nedenfor.";
+  const visibleTeam = focusMode ? [] : team;
+  const hiddenNote = focusMode && team.length ? `<div class="empty-state focus-note">Fokus-tilstand skjuler ${team.length} team-afgørelse${team.length === 1 ? "" : "r"}. De ligger stadig i “Se hele indbakken”.</div>` : "";
+  const groups = `${decisionGroup("Direktion", "Retning, smag og valg med stor effekt.", executive)}${decisionGroup("Team-afgørelser", "Mindre, reversibelt arbejde du kan tage, når det passer.", visibleTeam)}`;
+  list.innerHTML = decisions.length ? `${groups}${hiddenNote}` : `<div class="empty-state">Alt er afklaret lige nu. Manageren kan fortsætte med det, der er klart.</div>`;
+  const badge = focusMode ? executive.length : decisions.length;
+  document.querySelector("#inbox-count").textContent = badge;
+  document.querySelector("#inbox-count").hidden = !badge;
+  document.querySelector("#panel-count").textContent = badge;
+  document.querySelector("#decision-intro").textContent = !decisions.length
+    ? "Manageren har ikke noget, der kræver din retning lige nu."
+    : executive.length ? `${executive.length} direktionsvalg venter.${focusMode ? "" : " Team-afgørelser kan tages, når du har tid."}` : focusMode ? "Ingen direktionsvalg venter. Du kan arbejde uforstyrret." : "Ingen store valg venter. De mindre team-afgørelser er samlet nedenfor.";
 }
 
 function urgencyLabel(urgency) {
@@ -144,6 +208,7 @@ function closeDrawer() {
   drawer.classList.remove("open");
   drawer.setAttribute("aria-hidden", "true");
   scrim.classList.remove("open");
+  document.querySelectorAll("[data-nav]").forEach(item => item.classList.toggle("active", item.dataset.nav === "office"));
 }
 
 function openAgent(id) {
@@ -158,8 +223,10 @@ function openAgent(id) {
       <div><p class="eyebrow">${escapeHtml(agent.role)}</p><h2>${escapeHtml(agent.name)}</h2><p>${escapeHtml(agent.status)}</p></div>
     </div>
     <section class="drawer-section">
-      <p class="eyebrow">Aktuel opgave</p>
-      <div class="task-card"><strong>${escapeHtml(agent.task?.title || "Klar til næste opgave")}</strong><p>${escapeHtml(agent.task?.description || "")}</p><div class="task-progress"><i style="width:${Number(agent.task?.progress || 0)}%"></i></div></div>
+      <p class="eyebrow">Opgavekø · ${escapeHtml(workloadText(agent))}</p>
+      ${agent.workload?.next
+        ? `<div class="task-card"><strong>${escapeHtml(agent.workload.next.title)}</strong><p>${escapeHtml(stateLabel(agent.workload.next))} i ${escapeHtml(office.projects.find(item => item.id === agent.workload.next.projectId)?.name || "et projekt")}.</p><button class="task-ready" data-open-project="${escapeHtml(agent.workload.next.projectId)}">Åbn projektet</button></div>`
+        : `<div class="task-card"><strong>${escapeHtml(agent.task?.title || "Klar til næste opgave")}</strong><p>${escapeHtml(agent.task?.description || "")}</p></div>`}
     </section>
     <section class="drawer-section"><p class="eyebrow">Arbejdsbord</p><h3>Seneste materiale</h3><ul class="artifact-list">${agent.artifacts.map(artifact => `<li><span>${escapeHtml(artifact.name)}</span><small>${escapeHtml(artifact.state)}</small></li>`).join("")}</ul></section>
     ${competencies}
@@ -183,13 +250,15 @@ function openConnections() {
 }
 
 function stateLabel(task) {
-  return ({ active: "Arbejder", ready: "Klar", planned: "Planlagt", done: "Færdig", blocked: "Blokeret" })[task.state] || "Planlagt";
+  return ({ active: "Arbejder", ready: "Klar", planned: "Planlagt", done: "Færdig", blocked: "Blokeret", dropped: "Fravalgt" })[task.state] || "Planlagt";
 }
 
 function openProject(id) {
   const project = office.projects.find(item => item.id === id);
   if (!project) return;
-  const tasks = office.tasks.filter(task => task.projectId === id);
+  const allTasks = office.tasks.filter(task => task.projectId === id);
+  const tasks = allTasks.filter(task => task.state !== "dropped");
+  const dropped = allTasks.length - tasks.length;
   const references = (office.libraryItems || []).filter(item => item.projectId === id);
   const presentations = (office.presentations || []).filter(item => item.projectId === id);
   openDrawer(`
@@ -197,7 +266,7 @@ function openProject(id) {
     <section class="drawer-section"><p class="eyebrow">Fremdrift</p><div class="task-card"><strong>${project.progress}% samlet</strong><p>${project.activeCount} arbejder nu · ${project.readyCount} opgaver er klar · ${project.taskCount} i alt</p><div class="task-progress"><i style="width:${project.progress}%"></i></div></div></section>
     <section class="drawer-section"><p class="eyebrow">Fælles kontekst</p><div class="library-summary"><strong>${references.length} ${references.length === 1 ? "materiale" : "materialer"}</strong><p>Noter, briefs og links, der følger projektet.</p><button class="task-ready" data-open-library="${escapeHtml(project.id)}">Åbn bibliotek</button></div></section>
     <section class="drawer-section"><p class="eyebrow">Designvalg</p><div class="library-summary"><strong>${presentations.length} ${presentations.length === 1 ? "gennemgang" : "gennemgange"}</strong><p>Konkrete sammenligninger til Mads — aldrig opdigtede previews.</p><button class="task-ready" data-open-presentations="${escapeHtml(project.id)}">Se designgennemgange</button></div></section>
-    <section class="drawer-section"><p class="eyebrow">Arbejdskø</p><h3>Opgaver</h3><ul class="task-list">${tasks.length ? tasks.map(task => `<li><span class="task-state ${escapeHtml(task.state)}">${escapeHtml(stateLabel(task))}</span><strong>${escapeHtml(task.title)}</strong><p>${escapeHtml(task.description || "Ingen ekstra beskrivelse.")}</p>${task.acceptance ? `<p class="task-acceptance"><b>Tjek:</b> ${escapeHtml(task.acceptance)}</p>` : ""}<small>${escapeHtml(getAgent(task.role)?.name || task.role)} · ${task.progress}%</small>${task.state === "planned" ? `<button class="task-ready" data-ready-task="${escapeHtml(task.id)}">Klargør til worker</button>` : ""}</li>`).join("") : "<li><p>Der er ingen opgaver endnu. Skriv til manageren for at lave det første spor.</p></li>"}</ul></section>
+    <section class="drawer-section"><p class="eyebrow">Arbejdskø</p><h3>Opgaver</h3><ul class="task-list">${tasks.length ? tasks.map(task => `<li><span class="task-state ${escapeHtml(task.state)}">${escapeHtml(stateLabel(task))}</span><strong>${escapeHtml(task.title)}</strong><p>${escapeHtml(task.description || "Ingen ekstra beskrivelse.")}</p>${task.acceptance ? `<p class="task-acceptance"><b>Tjek:</b> ${escapeHtml(task.acceptance)}</p>` : ""}<small>${escapeHtml(getAgent(task.role)?.name || task.role)} · ${task.progress}%</small>${task.state === "planned" ? `<button class="task-ready" data-ready-task="${escapeHtml(task.id)}">Klargør til worker</button>` : ""}</li>`).join("") : "<li><p>Der er ingen opgaver endnu. Skriv til manageren for at lave det første spor.</p></li>"}</ul>${dropped ? `<p class="dropped-note">${dropped} opgave${dropped === 1 ? "" : "r"} fra fravalgte oplæg er skjult.</p>` : ""}</section>
     <div class="drawer-actions"><button class="drawer-secondary" data-new-presentation="${escapeHtml(project.id)}">+ Designgennemgang</button><button class="drawer-secondary" data-new-task="${escapeHtml(project.id)}">+ Ny opgave</button><button class="drawer-action" data-focus-project="${escapeHtml(project.id)}">Gør til dagens fokus <span>→</span></button></div>`);
 }
 
@@ -239,19 +308,30 @@ function openProfile() {
   openDrawer(`<div class="drawer-agent-head"><span class="avatar large-avatar">M</span><div><p class="eyebrow">Redigerbar hukommelse</p><h2>Mads-profilen</h2><p>Præferencer er signaler med kilde, ikke automatiske forbud.</p></div></div><section class="drawer-section"><p class="eyebrow">Kendte præferencer</p><ul class="task-list preference-list">${preferences}</ul></section><div class="drawer-message"><strong>Sådan bruges det</strong>Manageren må gerne udfordre en præference, når den nye situation er anderledes — men skal vise dig hvorfor.</div>`);
 }
 
+function resetComposer() {
+  pendingDecisionId = null;
+  managerInput.placeholder = defaultPlaceholder;
+}
+
 async function askManager(message) {
-  if (!managerWorkerOnline) return showToast("Manageren er offline. Start den lokale server og prøv igen.");
-  const managerDesk = document.querySelector("[data-agent='manager'] small");
-  managerDesk.textContent = "Tænker over din idé";
-  showToast("Manageren tænker med Codex…");
+  if (!serverOnline) return showToast("Kontoret kan ikke nå sin lokale server. Start `node server.mjs` og prøv igen.");
+  if (!managerAvailable) return showToast("Manageren er ikke forbundet: Codex blev ikke fundet på denne Mac.");
+  const form = document.querySelector("#manager-form");
+  form.classList.add("is-busy");
+  managerInput.disabled = true;
+  showToast("Manageren arbejder på et oplæg. Det tager typisk under et minut.");
   try {
     const result = await api("/api/manager", { method: "POST", body: JSON.stringify({ message, projectId: selectedProjectId, decisionId: pendingDecisionId }) });
     office = result.office;
-    pendingDecisionId = null;
+    resetComposer();
     render();
     showToast("Manageren har lagt et oplæg i din indbakke.");
   } catch (error) {
+    managerInput.value = managerInput.value || message;
     showToast(error.message);
+  } finally {
+    form.classList.remove("is-busy");
+    managerInput.disabled = false;
   }
 }
 
@@ -269,7 +349,13 @@ async function respondToDecision(id, choice) {
     const result = await api(`/api/decisions/${encodeURIComponent(id)}/respond`, { method: "POST", body: JSON.stringify({ choice }) });
     office = result.office;
     render();
-    showToast(choice === "primary" ? "Manageren har klargjort holdets næste opgaver." : "Manageren forbereder en ny runde.");
+    if (choice === "secondary") {
+      closeDrawer();
+      managerInput.focus();
+      managerInput.placeholder = "Hvad skal være anderledes i næste runde?";
+      return showToast("Oplægget er fravalgt. Skriv til manageren, hvad næste runde skal gøre bedre.");
+    }
+    showToast(decision.planTaskIds?.length ? "Opgaverne er klar. De starter først, når en godkendt worker kobles på." : "Beslutningen er registreret.");
   } catch (error) { showToast(error.message); }
 }
 
@@ -417,14 +503,30 @@ async function startMeeting() {
 function subscribe() {
   const stream = new EventSource("/api/events");
   stream.addEventListener("office-state", event => {
-    try { office = JSON.parse(event.data); render(); } catch { /* Ignore a malformed live event. */ }
+    try {
+      office = JSON.parse(event.data);
+      serverOnline = true;
+      managerAvailable = Boolean(office.managerAvailable);
+      render();
+    } catch { /* Ignore a malformed live event. */ }
+  });
+  // EventSource genopretter selv forbindelsen; imens viser kontoret ærligt, at det ikke er synkroniseret.
+  stream.addEventListener("error", () => {
+    if (!serverOnline) return;
+    serverOnline = false;
+    render();
   });
 }
 
 async function initialise() {
+  renderToday();
+  setInterval(renderToday, 60_000);
+  applyFocusMode();
+  applyTheme(readSetting("ai-kontoret:theme") === "evening");
   try {
     const [health, bootstrap] = await Promise.all([api("/api/health"), api("/api/bootstrap")]);
-    managerWorkerOnline = Boolean(health.ok);
+    serverOnline = Boolean(health.ok);
+    managerAvailable = Boolean(health.managerAvailable);
     office = bootstrap.office;
     selectedProjectId = office.activeProjectId;
     render();
@@ -434,9 +536,31 @@ async function initialise() {
   }
 }
 
+function applyFocusMode() {
+  const button = document.querySelector("#focus-button");
+  button.classList.toggle("is-focused", focusMode);
+  button.setAttribute("aria-pressed", String(focusMode));
+  button.textContent = focusMode ? "✓ Fokus til" : "✦ Fokus-tilstand";
+  if (office) renderDecisions();
+}
+
+function applyTheme(evening) {
+  document.body.classList.toggle("evening", evening);
+  const button = document.querySelector("#theme-button");
+  button.textContent = evening ? "☾" : "☼";
+  button.setAttribute("aria-pressed", String(evening));
+}
+
 document.querySelectorAll("[data-agent]").forEach(button => button.addEventListener("click", () => openAgent(button.dataset.agent)));
+document.querySelector("#project-crew").addEventListener("click", event => {
+  const member = event.target.closest("[data-agent-open]");
+  if (member) openAgent(member.dataset.agentOpen);
+});
 document.querySelector("#drawer-close").addEventListener("click", closeDrawer);
 scrim.addEventListener("click", closeDrawer);
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && drawer.classList.contains("open")) closeDrawer();
+});
 
 document.querySelector("#manager-form").addEventListener("submit", event => {
   event.preventDefault();
@@ -470,7 +594,13 @@ drawer.addEventListener("click", event => {
   const presentations = event.target.closest("[data-open-presentations]");
   const newPresentation = event.target.closest("[data-new-presentation]");
   const openAgentButton = event.target.closest("[data-open-agent]");
-  if (compose) { closeDrawer(); managerInput.focus(); managerInput.placeholder = `Hvad vil du bede manageren om omkring ${getAgent(compose.dataset.compose)?.name || "denne medarbejder"}?`; }
+  const openProjectButton = event.target.closest("[data-open-project]");
+  if (compose) {
+    closeDrawer();
+    managerInput.focus();
+    managerInput.placeholder = compose.dataset.compose === "manager" ? defaultPlaceholder : `Hvad vil du bede manageren om omkring ${getAgent(compose.dataset.compose)?.name.toLowerCase() || "denne medarbejder"}?`;
+  }
+  if (openProjectButton) openProject(openProjectButton.dataset.openProject);
   if (focus) activateProject(focus.dataset.focusProject);
   if (newTask) openTaskDialog(newTask.dataset.newTask);
   if (ready) readyTask(ready.dataset.readyTask);
@@ -488,10 +618,11 @@ document.querySelector("#table-button").addEventListener("click", () => meetingD
 document.querySelector("#dialog-close").addEventListener("click", () => meetingDialog.close());
 document.querySelector("#start-meeting").addEventListener("click", startMeeting);
 
-document.querySelector("#focus-button").addEventListener("click", event => {
-  const enabled = event.currentTarget.classList.toggle("is-focused");
-  event.currentTarget.textContent = enabled ? "✓ Fokus i gang" : "✦ Fokus-tilstand";
-  showToast(enabled ? "Manageren holder afbrydelser på et minimum den næste time." : "Fokus-tilstand er slået fra.");
+document.querySelector("#focus-button").addEventListener("click", () => {
+  focusMode = !focusMode;
+  writeSetting("ai-kontoret:focus", focusMode ? "1" : "0");
+  applyFocusMode();
+  showToast(focusMode ? "Fokus: indbakken viser kun direktionsvalg. Team-afgørelser venter i den fulde indbakke." : "Fokus-tilstand er slået fra.");
 });
 const attachmentInput = document.querySelector("#attachment-input");
 document.querySelector("#attach-button").addEventListener("click", () => attachmentInput.click());
@@ -515,12 +646,17 @@ document.querySelector("#library-dialog-close").addEventListener("click", () => 
 document.querySelector("#library-form").addEventListener("submit", createLibraryItem);
 document.querySelector("#presentation-dialog-close").addEventListener("click", () => document.querySelector("#presentation-dialog").close());
 document.querySelector("#presentation-form").addEventListener("submit", createPresentation);
-document.querySelector("#theme-button").addEventListener("click", () => { document.body.classList.toggle("evening"); showToast(document.body.classList.contains("evening") ? "Aftenstemning slået til." : "Dagslys slået til."); });
+document.querySelector("#theme-button").addEventListener("click", () => {
+  const evening = !document.body.classList.contains("evening");
+  applyTheme(evening);
+  writeSetting("ai-kontoret:theme", evening ? "evening" : "day");
+});
 document.querySelector("#profile-button").addEventListener("click", openProfile);
 document.querySelector("#chat-history").addEventListener("click", () => openConversation());
 document.querySelectorAll("[data-nav]").forEach(button => button.addEventListener("click", () => {
   document.querySelectorAll("[data-nav]").forEach(item => item.classList.remove("active"));
   button.classList.add("active");
+  if (button.dataset.nav === "office") { closeDrawer(); document.querySelector("#office").scrollIntoView({ behavior: "smooth", block: "start" }); }
   if (button.dataset.nav === "projects") document.querySelector("#projects").scrollIntoView({ behavior: "smooth" });
   if (button.dataset.nav === "history") openActivity();
   if (button.dataset.nav === "library") openLibrary();
