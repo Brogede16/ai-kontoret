@@ -27,11 +27,11 @@ Dette repository er den fælles, versionsstyrede sandhed for Mads' AI-kontor.
 
 ## Git-arbejde
 
-- Arbejd i en særskilt branch: `feature/...`, `fix/...` eller `docs/...`.
-- Skriv en lille, afgrænset ændring pr. pull request.
-- Kør `node --check app.js` og `node --check server.mjs` før aflevering.
-- En pull request skal beskrive: mål, ændrede filer, test, skærmbillede/preview hvis UI ændres, og åbne spørgsmål.
-- Gå aldrig direkte på `main` med en funktionel ændring.
+- Mads har godkendt direkte arbejde på `main`. Flere agenter (Claude Code og ChatGPT/Codex) skriver i samme repository, så hent altid seneste `main` før du starter, og igen før du pusher.
+- Hold hver commit lille og afgrænset, med en besked der forklarer hvad og hvorfor.
+- Kør `node --check app.js`, `node --check server.mjs` og `node --test` før push. Push aldrig rødt.
+- Brug en branch og pull request, når ændringen er stor, risikabel eller skal reviewes, før den lander.
+- Overskriv aldrig en anden agents arbejde: ingen force-push på `main`. Løs konflikter med en merge.
 
 ## Når du er i tvivl
 
