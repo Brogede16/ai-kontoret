@@ -249,7 +249,7 @@ function openAgent(id) {
 }
 
 function openTalentPool() {
-  const talentIds = ["game_designer", "graphic_designer", "copywriter", "marketer"];
+  const talentIds = ["game_designer", "graphic_designer", "copywriter", "marketer", "trend_scout"];
   const talents = talentIds.map(getAgent).filter(Boolean);
   openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">✦</span><div><p class="eyebrow">Godkendte kompetencepakker</p><h2>Talentbanken</h2><p>Manageren kan sætte en specialist på et projekt, når rollen giver en bedre aflevering.</p></div></div><div class="talent-grid">${talents.map(agent => `<article class="talent-card"><div class="talent-card-head">${face(agent)}<div><span>${escapeHtml(availabilityLabel(agent))}</span><h3>${escapeHtml(agent.name)}</h3><p>${escapeHtml(agent.role)}</p></div></div><p>${escapeHtml(agent.task?.description || agent.message)}</p><div class="competency-chips">${(agent.competencies || []).map(item => `<span>${escapeHtml(item)}</span>`).join("")}</div><div class="talent-card-actions"><button data-open-agent="${escapeHtml(agent.id)}">Se profil</button><button data-compose="${escapeHtml(agent.id)}">Bed manageren vurdere</button></div></article>`).join("")}</div><div class="drawer-message"><strong>Vigtigt lige nu</strong>Disse er projektroller, ikke aktive LLM-forbindelser. En opgave kan planlægges og blive klar, men ingen ekstern model eller adgang bliver startet herfra.</div>`);
 }
@@ -346,6 +346,41 @@ function openPresentations(projectId = selectedProjectId) {
   if (!project) return;
   const presentations = (office.presentations || []).filter(item => item.projectId === project.id);
   openDrawer(`<div class="drawer-agent-head"><span class="activity-mark">◫</span><div><p class="eyebrow">${escapeHtml(project.name)}</p><h2>Designgennemgange</h2><p>To retninger, tydelige kriterier og managerens anbefaling.</p></div></div><section class="drawer-section"><div class="presentation-list">${presentations.length ? presentations.map(item => `<article class="presentation-card"><span class="decision-type">${item.level === "executive" ? "Direktion" : "Team"}</span><h3>${escapeHtml(item.title)}</h3><div class="design-directions"><section><b>Retning A</b><p>${escapeHtml(item.directionA)}</p></section><section><b>Retning B</b><p>${escapeHtml(item.directionB)}</p></section></div><div class="decision-detail"><b>Vurderingskriterier</b><span>${escapeHtml(item.criteria)}</span></div><div class="decision-detail tradeoff"><b>Managerens anbefaling</b><span>${escapeHtml(item.recommendation)}</span></div></article>`).join("") : "<div class='empty-state'>Ingen designgennemgange endnu. Tilføj kun én, når A og B har et reelt grundlag.</div>"}</div></section><div class="drawer-actions"><button class="drawer-action" data-new-presentation="${escapeHtml(project.id)}">+ Klargør designgennemgang <span>→</span></button></div>`);
+}
+
+const radarLabels = { ny: "Ny", afprøves: "Afprøves", brugt: "Brugt", forkastet: "Forkastet" };
+
+// Radaren er kontorets fælles hukommelse om, hvad der rykker i AI og vibecoding. Punkter bliver først værdifulde, når de prøves af.
+function openRadar() {
+  const items = office.radar || [];
+  const open = items.filter(item => ["ny", "afprøves"].includes(item.status));
+  const closed = items.filter(item => !["ny", "afprøves"].includes(item.status));
+  const card = item => `<li class="radar-item is-${escapeHtml(item.status)}"><span class="task-state radar-${escapeHtml(item.status)}">${escapeHtml(radarLabels[item.status] || item.status)}</span><strong>${escapeHtml(item.title)}</strong><p class="preserve-lines">${escapeHtml(item.content)}</p><small>${escapeHtml(item.addedBy || "Mads")} · ${formatTime(item.createdAt)}</small><div class="task-actions">${item.url ? `<a class="task-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Kilde ↗</a>` : ""}${item.status === "ny" ? `<button class="task-ready" data-try-radar="${escapeHtml(item.id)}">Prøv det af</button>` : ""}${item.status === "afprøves" ? `<button class="task-ready" data-radar-status="brugt" data-radar-id="${escapeHtml(item.id)}">Det virkede</button>` : ""}${["ny", "afprøves"].includes(item.status) ? `<button class="task-link" data-radar-status="forkastet" data-radar-id="${escapeHtml(item.id)}">Forkast</button>` : `<button class="task-link" data-radar-delete="${escapeHtml(item.id)}">Fjern</button>`}</div></li>`;
+  openDrawer(`<div class="drawer-agent-head">${face(getAgent("trend_scout"))}<div><p class="eyebrow">AI & vibecoding</p><h2>Radaren</h2><p>Nye modeller, værktøjer og prompt-mønstre — kun det, der kan prøves af på et rigtigt projekt. Manageren ser de åbne punkter, men har ikke læst kilderne.</p></div></div><section class="drawer-section"><p class="eyebrow">Åbne · ${open.length}</p><ul class="task-list">${open.length ? open.map(card).join("") : "<li><p>Radaren er tom. Tilføj noget, du har set på Reddit, X, YouTube eller i en changelog.</p></li>"}</ul></section>${closed.length ? `<section class="drawer-section"><p class="eyebrow">Afprøvet eller forkastet · ${closed.length}</p><ul class="task-list">${closed.map(card).join("")}</ul></section>` : ""}<div class="drawer-message"><strong>Hvordan radaren fyldes</strong>Lige nu af dig. Trendspejderen henter ikke selv fra nettet, før en worker med netadgang er godkendt.</div><div class="drawer-actions"><button class="drawer-action" data-new-radar>+ Sæt noget på radaren <span>→</span></button></div>`);
+}
+
+async function radarRequest(path, method, payload, message) {
+  try {
+    const result = await api(path, { method, body: payload ? JSON.stringify(payload) : undefined });
+    office = result.office;
+    render();
+    openRadar();
+    if (message) showToast(message);
+    return result;
+  } catch (error) { showToast(error.message); return null; }
+}
+
+async function tryRadarItem(id) {
+  const item = (office.radar || []).find(entry => entry.id === id);
+  const project = currentProject();
+  if (!item || !project) return showToast("Vælg et projekt, forsøget skal høre til.");
+  if (!(await radarRequest(`/api/radar/${encodeURIComponent(id)}`, "PATCH", { status: "afprøves" }))) return;
+  openTaskDialog(project.id);
+  const form = document.querySelector("#task-form");
+  form.elements.role.value = "trend_scout";
+  form.elements.title.value = `Afprøv: ${item.title}`.slice(0, 160);
+  form.elements.description.value = `${item.content}${item.url ? `\nKilde: ${item.url}` : ""}`.slice(0, 520);
+  form.elements.acceptance.value = "Et lille forsøg på dette projekt med før/efter, og en anbefaling: brug, tilpas eller forkast.";
 }
 
 function openProfile() {
@@ -745,6 +780,13 @@ drawer.addEventListener("click", event => {
     managerInput.placeholder = compose.dataset.compose === "manager" ? defaultPlaceholder : `Hvad vil du bede manageren om omkring ${getAgent(compose.dataset.compose)?.name.toLowerCase() || "denne medarbejder"}?`;
   }
   if (openProjectButton) openProject(openProjectButton.dataset.openProject);
+  const radarStatus = event.target.closest("[data-radar-status]");
+  const radarDelete = event.target.closest("[data-radar-delete]");
+  const tryRadar = event.target.closest("[data-try-radar]");
+  if (event.target.closest("[data-new-radar]")) { document.querySelector("#radar-form").reset(); document.querySelector("#radar-dialog").showModal(); }
+  if (radarStatus) radarRequest(`/api/radar/${encodeURIComponent(radarStatus.dataset.radarId)}`, "PATCH", { status: radarStatus.dataset.radarStatus }, radarStatus.dataset.radarStatus === "brugt" ? "Godt. Overvej at gøre det til en præference eller en kompetencepakke." : "Radar-punktet er forkastet.");
+  if (radarDelete) radarRequest(`/api/radar/${encodeURIComponent(radarDelete.dataset.radarDelete)}`, "DELETE", null, "Fjernet fra radaren.");
+  if (tryRadar) tryRadarItem(tryRadar.dataset.tryRadar);
   const scopeButton = event.target.closest("[data-activity-scope]");
   if (scopeButton) openActivity(scopeButton.dataset.activityScope);
   const editProject = event.target.closest("[data-edit-project]");
@@ -808,6 +850,11 @@ document.querySelector("#library-form").addEventListener("submit", createLibrary
 document.querySelector("#presentation-dialog-close").addEventListener("click", () => document.querySelector("#presentation-dialog").close());
 document.querySelector("#presentation-form").addEventListener("submit", createPresentation);
 document.querySelector("#preference-form").addEventListener("submit", savePreference);
+document.querySelector("#radar-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  if (await radarRequest("/api/radar", "POST", Object.fromEntries(new FormData(form)), "Sat på radaren. Manageren ser det i næste oplæg.")) form.closest("dialog").close();
+});
 document.querySelector("#project-edit-form").addEventListener("submit", saveProject);
 document.querySelector("#start-form").addEventListener("submit", event => submitTaskForm(event, "start", "Opgaven står som i gang."));
 document.querySelector("#deliver-form").addEventListener("submit", event => submitTaskForm(event, "deliver", "Afleveringen er gemt i biblioteket."));
@@ -828,6 +875,7 @@ document.querySelectorAll("[data-nav]").forEach(button => button.addEventListene
   if (button.dataset.nav === "library") openLibrary();
   if (button.dataset.nav === "talent") openTalentPool();
   if (button.dataset.nav === "connections") openConnections();
+  if (button.dataset.nav === "radar") openRadar();
 }));
 
 function openInboxDrawer() {

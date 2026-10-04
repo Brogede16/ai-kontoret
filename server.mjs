@@ -21,7 +21,7 @@ const codexBinary = process.env.CODEX_BIN || "codex";
 const eventClients = new Set();
 let activeRun = false;
 let codexAvailable = null;
-const assignableRoles = new Set(["designer", "researcher", "developer", "reviewer", "game_designer", "graphic_designer", "copywriter", "marketer"]);
+const assignableRoles = new Set(["designer", "researcher", "developer", "reviewer", "game_designer", "graphic_designer", "copywriter", "marketer", "trend_scout"]);
 const projectStates = ["Udforsker", "Bygger", "Pause", "Afsluttet"];
 const imageExtensions = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
 
@@ -94,7 +94,7 @@ function parseBody(raw) {
 }
 
 function makeId(prefix) { return `${prefix}-${randomUUID().slice(0, 8)}`; }
-function roleName(role) { return ({ manager: "Manageren", designer: "Designeren", researcher: "Researcheren", developer: "Udvikleren", reviewer: "Revieweren", game_designer: "Spildesigneren", graphic_designer: "Grafikeren", copywriter: "Tekstforfatteren", marketer: "Marketingpersonen" })[role] || role; }
+function roleName(role) { return ({ manager: "Manageren", designer: "Designeren", researcher: "Researcheren", developer: "Udvikleren", reviewer: "Revieweren", game_designer: "Spildesigneren", graphic_designer: "Grafikeren", copywriter: "Tekstforfatteren", marketer: "Marketingpersonen", trend_scout: "Trendspejderen" })[role] || role; }
 
 function decodeImageData(dataUrl) {
   if (typeof dataUrl !== "string") throw new Error("Vælg et billede først.");
@@ -154,7 +154,7 @@ async function mutate(mutator) {
   return outcome;
 }
 
-export function managerPrompt(message, project, projectTasks, projectReferences, conversationHistory, preferences, previousDecision) {
+export function managerPrompt(message, project, projectTasks, projectReferences, conversationHistory, preferences, previousDecision, radarItems = []) {
   const projectContext = project ? `Aktivt projekt: ${project.name}. ${project.description}` : "Intet projekt er valgt endnu; afgør om beskeden peger på et nyt projekt eller næste spor.";
   const taskLine = task => {
     const by = task.state === "active" ? ` · udføres af ${task.executor || "Mads"}` : "";
@@ -170,6 +170,9 @@ export function managerPrompt(message, project, projectTasks, projectReferences,
   const conversationContext = conversationHistory.length
     ? `Seneste læsbare projekthistorik (ikke skjult ræsonnement):\n${[...conversationHistory].reverse().map(item => `- ${item.role === "mads" ? "Mads" : "Manageren"}: ${item.text}`).join("\n")}`
     : "Projekthistorik: ingen tidligere beskeder.";
+  const radarContext = radarItems.length
+    ? `\nRadar (nyt om AI og vibecoding, registreret af Mads eller holdet; kilderne er ikke læst af dig):\n${radarItems.map(item => `- [${item.status}] ${item.title}: ${item.content}`).join("\n")}\nBrug kun et radar-punkt, hvis det konkret forbedrer dette spor, og sig hvorfor.`
+    : "";
   const profile = preferences.map(preference => `- ${preference.value}`).join("\n");
   const decisionContext = previousDecision ? `\nMads svarer på dit tidligere spørgsmål: "${previousDecision.title}". Det tidligere oplæg var: "${previousDecision.text}". Brug hans nye besked som svaret og lav et opdateret spor.` : "";
   return `Du er Manageren i Mads' AI-kontor. Du skal hjælpe Mads med at omsætte en idé til et lille, sikkert arbejdsspor.
@@ -178,13 +181,13 @@ Mads skrev: "${message}"
 ${projectContext}
 ${taskContext}
 ${referenceContext}
-${conversationContext}
+${conversationContext}${radarContext}
 
 Kendte præferencer (bløde signaler, ikke forbud):
 ${profile}
 ${decisionContext}
 
-Tilgængelige specialistroller i talentbanken: Spildesigneren (core loop, progression, systembrief), Grafikeren (art direction, asset-briefs, visuelle referencer), Tekstforfatteren (UX-tekst, tone-of-voice, tekstvarianter) og Marketingpersonen (målgruppe, positionering, launch-hypoteser). Brug kun en specialist, når rollen ændrer den konkrete aflevering. En rolle i talentbanken er ikke en tilsluttet model eller en ny adgang.
+Tilgængelige specialistroller i talentbanken: Spildesigneren (core loop, progression, systembrief), Grafikeren (art direction, asset-briefs, visuelle referencer), Tekstforfatteren (UX-tekst, tone-of-voice, tekstvarianter) Marketingpersonen (målgruppe, positionering, launch-hypoteser) og Trendspejderen (nye AI-modeller, værktøjer, prompt-mønstre og vibecoding-workflows omsat til konkrete forsøg). Brug kun en specialist, når rollen ændrer den konkrete aflevering. En rolle i talentbanken er ikke en tilsluttet model eller en ny adgang.
 
 Returnér KUN et JSON-objekt, der overholder det givne schema. Vælg højst tre roller. Stil kun et spørgsmål, hvis noget vigtigt reelt blokerer næste trin; ellers er question null.
 
@@ -219,12 +222,12 @@ export function parsePlan(message) {
   };
 }
 
-function runManager(message, project, projectTasks, projectReferences, conversationHistory, preferences, previousDecision) {
+function runManager(message, project, projectTasks, projectReferences, conversationHistory, preferences, previousDecision, radarItems) {
   return new Promise((resolve, reject) => {
     const child = spawn(codexBinary, [
       "exec", "--json", "--sandbox", "read-only", "--ephemeral", "--cd", root,
       "--output-schema", join(root, "schemas", "manager-plan.schema.json"),
-      managerPrompt(message, project, projectTasks, projectReferences, conversationHistory, preferences, previousDecision)
+      managerPrompt(message, project, projectTasks, projectReferences, conversationHistory, preferences, previousDecision, radarItems)
     ], { cwd: root, env: { ...process.env, NO_COLOR: "1" } });
 
     let output = "";
@@ -527,7 +530,7 @@ const server = createServer(async (request, response) => {
         state.agents.manager.task = { title: "Samler et arbejdsspor", description: "Manageren vurderer mål, roller og om noget reelt behøver Mads' beslutning.", progress: 35 };
         addActivity(state, "manager", "Tog imod en ny besked fra Mads og samler et forslag.", project?.id || null, "manager");
       });
-      const result = await runManager(message, project, projectTasks, projectReferences, conversationHistory, before.preferences, previousDecision);
+      const result = await runManager(message, project, projectTasks, projectReferences, conversationHistory, before.preferences, previousDecision, (before.radar || []).filter(item => ["ny", "afprøves"].includes(item.status)).slice(0, 5));
       const outcome = await mutate(state => {
         const projectId = project?.id || state.activeProjectId;
         // Spørgsmålet lukkes først, når der faktisk findes et nyt oplæg. Fejler kørslen, står det stadig i indbakken.
@@ -683,6 +686,33 @@ const server = createServer(async (request, response) => {
     } catch (error) { return json(response, 400, { error: error.message || "Materialet kunne ikke fjernes." }); }
   }
 
+  if (segments[0] === "api" && segments[1] === "radar" && ((request.method === "POST" && !segments[2]) || (["PATCH", "DELETE"].includes(request.method) && segments[2]))) {
+    try {
+      const body = request.method === "DELETE" ? {} : parseBody(await readBody(request));
+      const outcome = await mutate(state => {
+        if (request.method === "POST") {
+          const item = { id: makeId("radar"), ...radarFields(body), status: "ny", addedBy: cleanText(body.addedBy, 60) || "Mads", createdAt: new Date().toISOString() };
+          state.radar.unshift(item);
+          state.radar = state.radar.slice(0, 120);
+          addActivity(state, "trend_scout", `Nyt på radaren: “${item.title}” · tilføjet af ${item.addedBy}.`, null, "radar");
+          return { item };
+        }
+        const item = state.radar.find(entry => entry.id === segments[2]);
+        if (!item) throw new Error("Radar-punktet findes ikke længere.");
+        if (request.method === "DELETE") {
+          state.radar = state.radar.filter(entry => entry.id !== item.id);
+          return { item };
+        }
+        if (!radarStatuses.includes(body.status)) throw new Error("Ukendt status for radar-punktet.");
+        item.status = body.status;
+        item.updatedAt = new Date().toISOString();
+        addActivity(state, "trend_scout", `Radar-punktet “${item.title}” er nu: ${item.status}.`, null, "radar");
+        return { item };
+      });
+      return json(response, request.method === "POST" ? 201 : 200, { ok: true, ...outcome.result, office: officeView(outcome.state) });
+    } catch (error) { return json(response, 400, { error: error.message || "Radaren kunne ikke opdateres." }); }
+  }
+
   if (request.method === "GET") return serveStatic(url.pathname, response);
   return json(response, 405, { error: "Metoden er ikke tilladt." });
 });
@@ -693,6 +723,18 @@ function preferenceFields(body) {
   const value = cleanText(body.value, 400);
   if (!label || !value) throw new Error("En præference skal have en kort overskrift og en forklaring.");
   return { label, value, confidence: body.confidence === "antagelse" ? "antagelse" : "bekræftet" };
+}
+
+const radarStatuses = ["ny", "afprøves", "brugt", "forkastet"];
+
+// Et radar-punkt skal kunne efterprøves: hvad er nyt, hvorfor det betyder noget for kontoret, og helst en kilde.
+function radarFields(body) {
+  const title = cleanText(body.title, 140);
+  const content = cleanText(body.content, 800);
+  const url = cleanText(body.url, 600);
+  if (!title || !content) throw new Error("Et radar-punkt skal have en titel og en kort forklaring af, hvorfor det er relevant.");
+  if (url && !/^https?:\/\//i.test(url)) throw new Error("Kilden skal være et http- eller https-link.");
+  return { title, content, url: url || null };
 }
 
 function cleanText(value, max) {
@@ -756,7 +798,7 @@ function markAgentReady(agent) {
 }
 
 function roleTaskAction(role, nextAction) {
-  const prefix = { designer: "formgiv", researcher: "undersøg", developer: "gør klar til at bygge", reviewer: "forbered kvalitetstjek af", game_designer: "afgræns gameplay for", graphic_designer: "læg visuel retning for", copywriter: "formulér tekst til", marketer: "positionér og afgræns" }[role] || "bearbejd";
+  const prefix = { designer: "formgiv", researcher: "undersøg", developer: "gør klar til at bygge", reviewer: "forbered kvalitetstjek af", game_designer: "afgræns gameplay for", graphic_designer: "læg visuel retning for", copywriter: "formulér tekst til", marketer: "positionér og afgræns", trend_scout: "find afprøvelige nyheder til" }[role] || "bearbejd";
   return `${prefix} — ${nextAction}`;
 }
 
