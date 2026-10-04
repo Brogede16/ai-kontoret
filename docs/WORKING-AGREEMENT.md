@@ -39,6 +39,7 @@ GitHub er sandhedskilden for kode, issues, pull requests, checks, projektbeslutn
 - En parallel opgave skal have en konkret aflevering og en skrevet afhængighed. Hvis designet ændrer kodearbejdet, skal udvikleren afvente den beslutning eller kun bygge et uafhængigt skelet.
 - Manageren samler kun til møde, når der er et reelt konfliktpunkt, en afhængighed eller en beslutning til Mads. Et møde er ikke status-animation.
 - En aflevering flytter ikke automatisk næste led i gang. Den bliver klar til review eller Mads' beslutning, medmindre den konkrete workflow-kontrakt allerede er godkendt.
+- Manageren må bemande et projekt fra talentbanken efter behov. Den må ikke selv installere en ny CLI, forbinde en konto, ændre en abonnementsplan eller udvide en medarbejders værktøjsrettigheder.
 
 ## Direktion og team-afgørelser
 

@@ -72,6 +72,14 @@ Denne fil er den korte, menneskelæselige beslutningslog for produktets retning.
 
 **Hvorfor:** Parallelitet og feedback er værdifulde; ritualiserede agent-samtaler uden nyt artefakt er ikke.
 
+## 012 · Manageren bemander projekter frit inden for talentbanken
+
+**Beslutning:** Manageren kan selv foreslå, tilføje og afvikle roller på et projekt, når det forbedrer den konkrete aflevering. Spildesigner, tekstforfatter og marketingperson er projektroller, der kan hentes ind efter behov — de skal ikke være aktive på alle projekter.
+
+**Hvorfor:** Det bevarer følelsen af et rigtigt, fleksibelt team, uden at Mads selv skal micromanage hver tildeling.
+
+**Grænse:** Manageren må kun bemande blandt allerede godkendte kompetencepakker. Ny software, login, modeludbyder, betalt plan eller skriveadgang er stadig en beslutning til Mads.
+
 ## Åbne beslutninger
 
 - Hvilken worker skal først få eksplicit, begrænset adgang: GitHub, en lokal projektmappe eller research?

@@ -48,6 +48,8 @@ Et designvalg skal vises som en **designgennemgang**, ikke som en uunderbygget t
 
 Manager, designer, researcher, udvikler, reviewer og grafiker er roller. De kan drives af samme model eller af forskellige udbydere, men kun når det giver bedre output. Underliggende modeller må aldrig bestemme produktets organisation.
 
+Manageren må frit sammensætte et projektteam fra talentbanken og tilføje relevante roller, når opgaven fortjener det. En “ansættelse” betyder en projektrolle med en klar aflevering og en begrænset kompetencepakke — ikke automatisk installation af software, aktivering af en betalt model eller nye skrive-/deployrettigheder.
+
 ## Mads-profilen
 
 Tidligere valg er bløde præferencer med kontekst — ikke forbud. En medarbejder skal kunne sige: "Du fravalgte dette i projekt X, men her anbefaler jeg det af denne grund." Kun eksplicitte sikkerheds- og økonomiregler er hårde stopregler.
